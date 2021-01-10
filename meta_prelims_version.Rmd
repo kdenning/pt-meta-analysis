@@ -20,6 +20,7 @@ output: html_document
 #install.packages("metafor")
 #install.packages("Cairo")
 #install.packages("tinytex")
+#install.packages("compute.es")
 library(rio)
 library(here)
 library(tidyverse)
@@ -30,6 +31,7 @@ library(emmeans)
 library(Cairo)
 library(tinytex)
 library(metafor)
+library(compute.es)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -49,5 +51,34 @@ trace(grDevices:::png, quote({
 # importing data
 prelims_data <- import("prelims_data.xlsx") 
 
-
+prelims_data %<>% 
+  mutate(d = as.numeric(cohens_d))
 ```
+
+# Convert effect sizes and CI around it
+
+## Convert F to d
+
+```{r}
+f_to_d <- prelims_data %>% 
+  select(authors, Year, effect_size_num, study_num_total, F_score, n_pt, n_comparison) %>% 
+  filter(F_score != "NA") %>% 
+  mutate(f = F_score,
+         n.1 = n_pt,
+         n.2 = n_comparison)
+
+f_to_d_output <- fes(f = F_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = f_to_d) #function drops 95CI when producing table for some reason
+
+f_to_d_output %<>% 
+  select(id, d, var.d) %>% 
+  mutate(effect_size_num = id,
+         var_d = var.d) %>% 
+  select(-var.d,-id)
+
+prelims_data_fconverted <- left_join(prelims_data, f_to_d_output, by = "effect_size_num")
+```
+
+## Convert t to d
+## Convert means/sds to d
+## Convert regression coefficients to d
+## Convert all d's to d unbiased
