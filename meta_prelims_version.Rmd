@@ -120,3 +120,7 @@ We need SD of the DV - which most studies did not provide - in order to convert 
 
 
 ## Convert all d's to d unbiased
+
+# reverse score d's
+
+# calculate variance of d for effects that don't have it already
