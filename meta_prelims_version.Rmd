@@ -122,7 +122,8 @@ We need SD of the DV - which most studies did not provide - in order to convert 
 ```{r}
 
 meta_data <- converted_data %>%  
-  mutate(cohens_d = as.numeric(cohens_d)) %>% 
+  mutate(cohens_d = as.numeric(cohens_d),
+         reverse = as.factor(reverse)) %>% 
   mutate(cohens_d_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((cohens_d^2)/(2*(n_pt+n_comparison))))) %>% #calculated variance by hand for the d's we extracted from articles directly; the ones we converted also came with var calculations
   pivot_longer(c(cohens_d, d.x, d.y, yi)) %>% #  Wrangling all converted d's into one column
   mutate(d = value) %>% 
@@ -137,10 +138,23 @@ meta_data <- converted_data %>%
          dunb = J*d, #d unbiased
          var_dunb = ((J^2)*var),  #variance for d unbiased
          lowCI_dunb = dunb-1.96*sqrt(var_dunb), #getting 95% CI's for d unbiased
-         upCI_dunb  = dunb+1.96*sqrt(var_dunb)) 
-
+         upCI_dunb  = dunb+1.96*sqrt(var_dunb)) %>% 
+  mutate(dunb = ifelse(reverse == "yes", 
+                       dunb*-1,
+                       ifelse(reverse == "no",
+                              dunb*1, NA))) %>% #reverse scored dunb that needed to be 
+  select(-c(DOI, Notes, outcome_description_from_coding, target_long_description,
+            weird_sample, F_score, t_score, effect_size, effect_size_type,
+            effect_direction, p_value, mean_pt, sd_pt, se_pt, 
+            mean_comparison, sd_comparison,se_comparison, 
+            `Note about directionality of cohen's d`)) %>% 
+  mutate(sample_number_total = as.factor(sample_number_total),
+         pt_comparison = as.factor(pt_comparison),
+         outcome_type = as.factor(outcome_type),
+         target_ingroup_nonspecific = as.factor(target_ingroup_nonspecific),
+         outcome_scale_group = as.factor(outcome_scale_group),
+         target_out_minor = as.factor(target_out_minor),
+         target_adversary = as.factor(target_adversary),
+         target_emapthetic_need = as.factor(target_empathetic_need),
+         between_within = as.factor(between_within))
 ```
-
-## Convert all d's to d unbiased
-
-# reverse score relevant d's
