@@ -267,9 +267,27 @@ We will have to collapse across across "day in the life" and "other" control con
 
 # Overall Meta-analysis
 
-```{r}
+```{r data prep}
 #collapsing across conditions for data-prep
 
-meta_data %>% 
+meta_overall1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective")
 
+droplevels(meta_overall1$pt_comparison)
+
+# Effect sizes in overall model
+meta_overall1 %>% 
+  select(effect_size_num) %>% 
+  unique() %>% 
+  count()
+
+# Effect sizes per comparison and stereotyping category
+meta_overall1 %>% 
+  select(dunb, pt_comparison, outcome_type) %>% 
+  unique() %>% 
+  group_by(pt_comparison, outcome_type) %>% 
+  count() 
 ```
