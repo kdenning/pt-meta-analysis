@@ -3,6 +3,8 @@ title: 'Perspective Taking Meta-Analysis: Prelims Version'
 author: "Kathryn Denning"
 date: "1/9/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 
@@ -156,5 +158,118 @@ meta_data <- converted_data %>%
          target_out_minor = as.factor(target_out_minor),
          target_adversary = as.factor(target_adversary),
          target_emapthetic_need = as.factor(target_empathetic_need),
-         between_within = as.factor(between_within))
+         between_within = as.factor(between_within)) %>% 
+  na.omit()
+```
+
+# Descriptive information about the studies that made it into the meta-analysis
+
+```{r}
+# Number of papers
+
+meta_data %>% 
+  mutate(authors = as.factor(authors)) %>% 
+  select(authors) %>% 
+  unique() %>% 
+  count()
+
+# Number of studies
+
+meta_data %>% 
+  select(study_num_total) %>% 
+  unique() %>% 
+  count()
+
+# Number of unique samples due to some studies having multiple targets
+
+meta_data %>% 
+  select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+
+# Unique effect sizes total
+
+meta_data %>% 
+  select(effect_size_num) %>% 
+  unique() %>% 
+  count()
+
+# Effect sizes per outcome category
+
+meta_data %>% 
+  select(dunb, outcome_type) %>% 
+  unique() %>% 
+  group_by(outcome_type) %>% 
+  count() %>% 
+  mutate(outcome_type = recode(outcome_type,
+                               `1` = "Stereotyping/Bias",
+                               `2` = "Overlap/Merging",
+                               `3` = "Interpersonal Feelings"))
+```
+
+## Do we need to collapse perspective taking conditions?
+
+### Stereotyping outcome
+
+```{r}
+# Number of effect sizes per comparison we coded 
+
+k_per_comparison <- meta_data %>% 
+  select(dunb, pt_comparison, outcome_type) %>% 
+  unique() %>% 
+  group_by(pt_comparison, outcome_type) %>% 
+  count() %>% mutate(pt_comparison = recode(pt_comparison,
+                                `1` = "Self PT vs Day control",
+                                `2` = "Self PT vs Other control",
+                                `3` = "Self PT vs Objective",
+                                `4` = "Self PT vs Suppression",
+                                `5` = "Other PT vs Day control",
+                                `6` = "Other PT vs Other control",
+                                `7` = "Other PT vs Objective",
+                                `9` = "Other PT vs Self PT",
+                                `10` = "PT US vs Day control",
+                                `11` = "PT US vs other control",
+                                `12` = "PT US vs Objective",
+                                `13` = "PT US vs Suppression"))
+
+# For stereotyping outcome
+k_per_comparison %>% 
+  filter(outcome_type == 1)
+```
+
+Our pre-registered rule was that there must be k = 20 per cell. As this does not apply to every relevant cell, we will need to collapse until we reach this. For stereotyping, we will do the following:
+
+* Drop any comparison including suppression, as there are not enough even when collapsed (k = 3).
+* We will fun analyses using two of the following comparisons to get at different theoretical comparisons:
+    + We will collapse across the "Day in the life" and "Other" control conditions. This will allow us to analyze Imagine-self versus Imagine-other perspective taking in comparison to a broad control and the objective comparison condition. 
+    + We will then collapse across Imagine-self and Imagine-other to examine the if there is difference between the effect of perspective taking instructions when the comparison is the "Day in the life control" versus "Other control" or objective comparison.
+* Before adding in moderators, we will add the PT unspecified comparisons to the analysis (collapsed across Imagine-self and Imagine-other) to see if they impact the results.
+
+### Merging/Overlap outcome
+
+```{r}
+# For overlap/merging outcome
+k_per_comparison %>% 
+  filter(outcome_type == 2)
+```
+
+Due to the lower number of studies in this outcome category, we will have to collapse across both Imagine-self and Imagine-other perspective taking instructions as well as "Day in the life" and "Other control" comparisons. As this is the most limiting of the outcomes, we will have to collapse this same way in all outcome categories for the overall meta-analysis when we will include outcome as a predictor. We will still be able to conduct a second analysis where we had unspecified analyses in to see if they impact the results.
+
+### Interpersonal feelings outcome
+
+```{r}
+# For interpersonal feelings
+k_per_comparison %>% 
+  filter(outcome_type == 3)
+```
+
+We will have to collapse across across "day in the life" and "other" control conditions. As our "Self PT versus Objective" is only one study under our pre-registered limit - and this is a preliminary analysis for a doctoral requirement - we will include that category for this analysis with the expectation that when we include regression coefficients and data from contacted authors, it will be over our limit (spoiler alert: it will). Therefore, for the analysis specifically examining interpersonal feelings outcomes, we will not collapse across Imagine-self and Imagine-other instruction comparisons. We will also add in unspecified at the end to see if it impacts the results.
+
+# Overall Meta-analysis
+
+```{r}
+#collapsing across conditions for data-prep
+
+meta_data %>% 
+
 ```
