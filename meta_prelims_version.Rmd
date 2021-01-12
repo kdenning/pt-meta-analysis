@@ -327,7 +327,7 @@ meta_multi1 <- rma.mv(dunb,
 meta_multi1
 ```
 
-The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of the objective condition represented by the slope of pt_comparison:pt_v_objective. The summary effect size would be found by adding them together. The moderator test is significant.
+The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of pt_comparison:pt_v_objective represents the difference in effect sizes compared to the refence level. The summary effect size would be found by adding them together. The moderator test is significant.
 
 ## Pre-registered multivariate model with perspective taking and outcome type
 
@@ -703,8 +703,148 @@ In comparing the two tables, the only significant difference in effect sizes is 
 
 # Stereotyping model
 
-```{r}
+For this stereotyping model - like the literature - higher scores/higher effects, indicate more stereotyping. Lower scores indicate less stereotyping (e.g., more stereotype reduction).
 
+```{r stereo model data prep}
+#collapsing across conditions for data-prep
+## creating dataset collapsing across "day in the life" versus "other control"
+meta_stereo1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      self_v_control = c("1", "2"),
+                                      self_v_objective = c("3"),
+                                      other_v_control = c( "5", "6"),
+                                      other_v_objective = c("7"))) %>% 
+  filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
+           pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
 
+meta_stereo1 %<>% 
+  filter(outcome_type == "1")
+
+## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
+meta_stereo2 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison,
+                                      pt_v_day_control = c("1", "5"),
+                                      pt_v_other_control = c("2", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_day_control" | 
+           pt_comparison == "pt_v_other_control" |
+           pt_comparison == "pt_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+meta_stereo2 %<>% 
+  filter(outcome_type == "1")
+  
 ```
 
+## Number of unique effect sizes
+
+```{r stereo effect size num}
+meta_stereo1 %>% 
+  count()
+```
+
+## Overall stereotyping model - no mods
+
+```{r stereo model no mods}
+stereo_nomods <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_nomods
+```
+
+Small and non-significant effect of perspective taking versus any comparison in the stereotyping outcome.
+
+## Model comparing imagine-self vs imagine-other instructions with a combined control and objective comparisons
+
+```{r stereo model imagine self vs other}
+contrasts(meta_stereo1$pt_comparison) <- contr.treatment(4)
+contrasts(meta_stereo1$pt_comparison) 
+
+# OVerall model across outcome type
+stereo_meta1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1
+```
+
+The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
+
+```{r stereo self vs objective model}
+meta_stereo1_selfobj <-meta_stereo1 %>% 
+  filter(pt_comparison == "self_v_objective")
+
+stereo_meta1_selfobjest <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_selfobj)
+
+stereo_meta1_selfobjest
+```
+
+```{r stereo other vs objective model}
+meta_stereo1_otherobj <-meta_stereo1 %>% 
+  filter(pt_comparison == "other_v_objective")
+
+stereo_meta1_otherobjest <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_otherobj)
+
+stereo_meta1_otherobjest
+```
+
+```{r stereo self vs control model}
+meta_stereo1_selfcontrol <-meta_stereo1 %>% 
+  filter(pt_comparison == "self_v_control")
+
+stereo_meta1_selfcontrolest <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_selfcontrol)
+
+stereo_meta1_selfcontrolest
+```
+
+```{r stereo other vs control model}
+meta_stereo1_othercontrol <-meta_stereo1 %>% 
+  filter(pt_comparison == "other_v_control")
+
+stereo_meta1_othercontrolest <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_othercontrol)
+
+stereo_meta1_othercontrolest
+```
+
+```{r stereo effect size table self vs other model}
+stereo_effect_table1 <- cbind(label = c("self_v_control",
+                                        "self_v_objective",
+                                        "other_v_control",
+                                        "other_v_objective"),
+                              estimate = c(stereo_meta1_selfcontrolest[1],
+                                           stereo_meta1_othercontrolest[1],
+                                           stereo_meta1_selfobjest[1], 
+                                           stereo_meta1_otherobjest[1]),
+                              pvalue = c(stereo_meta1_selfcontrolest[5],
+                                           stereo_meta1_othercontrolest[5],
+                                           stereo_meta1_selfobjest[5], 
+                                           stereo_meta1_otherobjest[5]),
+                              ci_higher = c(stereo_meta1_selfcontrolest[6],
+                                           stereo_meta1_othercontrolest[6],
+                                           stereo_meta1_selfobjest[6], 
+                                           stereo_meta1_otherobjest[6]),
+                              ci_lower = c(stereo_meta1_selfcontrolest[7],
+                                           stereo_meta1_othercontrolest[7],
+                                           stereo_meta1_selfobjest[7], 
+                                           stereo_meta1_otherobjest[7]))
+stereo_effect_table1
+```
+
+As expected based on the intial model, the estimates are all small and non-significant.
