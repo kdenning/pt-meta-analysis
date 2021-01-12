@@ -23,6 +23,7 @@ editor_options:
 #install.packages("Cairo")
 #install.packages("tinytex")
 #install.packages("compute.es")
+#install.packages("multcomp")
 library(rio)
 library(here)
 library(tidyverse)
@@ -34,6 +35,7 @@ library(Cairo)
 library(tinytex)
 library(metafor)
 library(compute.es)
+library(multcomp)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -274,9 +276,22 @@ meta_overall1 <- meta_data %>%
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       pt_v_control = c("1", "2", "5", "6"),
                                       pt_v_objective = c("3", "7"))) %>% 
-  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective")
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(meta_overall1$pt_comparison)),
+         dunb = ifelse(outcome_type == "1",
+                       dunb*-1,
+                       ifelse(outcome_type != "1",
+                              dunb*1, NA)),
+         outcome_type = recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) 
 
-droplevels(meta_overall1$pt_comparison)
+#for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
+
+
+# WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
+
 
 # Effect sizes in overall model
 meta_overall1 %>% 
@@ -291,3 +306,172 @@ meta_overall1 %>%
   group_by(pt_comparison, outcome_type) %>% 
   count() 
 ```
+
+## Overall meta-analytic effect before we look into theoretical moderators
+
+```{r}
+meta_overall <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_overall
+```
+
+Across perspective taking condition and outcome, there is a small but statiscially significant effect.
+
+## Multivariate model with perspective taking only
+
+```{r}
+#setting up dummy codes; stereotyping and pt_v_control are the respective comparison groups because they are coded as 1
+contrasts(meta_overall1$pt_comparison) <- contr.treatment(2)
+contrasts(meta_overall1$pt_comparison) 
+
+# OVerall model across outcome type
+meta_multi1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_multi1
+
+
+```
+
+The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of the objective condition represented by the slope of pt_comparison:pt_v_objective. The summary effect size would be found by adding them together. The moderator test is significant.
+
+## Pre-registered multivariate model with perspective taking and outcome type
+
+```{r}
+contrasts(meta_overall1$outcome_type) <- contr.treatment(3)
+contrasts(meta_overall1$outcome_type) 
+
+# When we include outcome type
+meta_multi2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_multi2
+```
+
+The intercept is when both moderators = 0 (When the pt is compared to the control, and stereotyping is the reference). We are particularly interested in the interaction and estimates. The fifth estimate (pt_comparison2:outcome_type2) represents the change comparison in perspective taking conditions between stereotyping and merging. The sixth comparison represents (pt_comparison2:outcome_type3) comparison in perspective taking conditions between stereotyping and interpersonal feelings.
+
+And these two comparisons are significantly different from one another (in looking up how to use Metafor, it was demonstrated by the creators that it was necessary to do this):
+
+```{r}
+anova(meta_multi2, btt=5:6)
+```
+
+All possible pairwise comparisons:
+
+```{r}
+summary(glht(meta_multi2, linfct=contrMat(c("pt_v_control:Stereotyping"=1,
+                                            "pt_v_control:Overlap"=1,
+                                            "pt_v_control:Interpersonal Feels"=1,
+                                       "pt_v_objective:Stereotyping"=1,
+                                       "pt_v_objective:Overlap"=1,
+                                       "pt_v_objective:Interpersonal Feels"=1), 
+                                       type="Tukey")), 
+        test=adjusted("none"))
+
+```
+
+We want to answer:
+
+Is there an average effect size per comparison, per outcome? This can't be done by dropping the intercept like Wolfgang (creator suggested about non MLM structures) because then the MLM structure does not work. McAuliffe ran individual meta-analyses for each comparison... 
+
+The multivariate overall model tells us there are statistical differences between context and condition (but does not provide pairwise comparison of merging vs interpersonal feelings), but does not tell us if (by themselves) they differ from 0. The effect sizes it is providing are too confounded by other factors.
+
+To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the dataset (as seen in McAuliffe meta-analysis):
+
+* PT vs Control in the Stereotyping outcome context
+
+```{r}
+control_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
+
+
+meta_control_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_stereo_subset )
+meta_control_stereo
+```
+
+* PT vs control in the overlap outcome context
+
+```{r}
+control_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
+
+
+meta_control_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_overlap_subset)
+meta_control_overlap
+```
+
+* PT vs control in the interpersonal feelings outcome context
+
+```{r}
+control_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
+
+
+meta_control_inter <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_inter_subset)
+meta_control_inter
+```
+
+
+
+* PT vs objective in the stereotyping outcome context
+
+```{r}
+obj_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
+
+
+meta_obj_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_stereo_subset)
+meta_obj_stereo
+```
+
+* PT vs objective in the overlap outcome context
+
+```{r}
+obj_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
+
+
+meta_obj_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_overlap_subset)
+meta_obj_overlap
+```
+
+* PT vs control in the interpersonal feelings outcome context
+
+```{r}
+obj_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
+
+
+meta_obj_inter <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_inter_subset)
+meta_obj_inter
+```
+
+The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). They found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction (.16). 
+
+Neither perspective taking comparison is significantly different from zero. The effect size for pt_v_control & stereotyping is almost identical to the intercept of the original model (which it should be), which is comforting statistically.
+
+Only the comparison of pt_v_control is statistically different from 0 for the Overlap/merging category. This is surprising and opposite of the pattern found in the interpersonal feelings category. The comparison of pt_v_objective is marginal, though the estimate itself is not much smaller. This is the category in which the number of studies included is small, which could be impacting these results.
