@@ -56,11 +56,11 @@ trace(grDevices:::png, quote({
 prelims_data <- import("prelims_data.xlsx") 
 ```
 
-# Convert effect sizes and CI around it
+# Convert effect sizes
 
 ## Convert F to d
 
-```{r}
+```{r convert F to d}
 f_to_d <- prelims_data %>% 
   select(effect_size_num, F_score, n_pt, n_comparison) %>% 
   filter(F_score != "NA")
@@ -78,7 +78,7 @@ prelims_data_fconverted <- left_join(prelims_data, f_to_d_output, by = "effect_s
 
 ## Convert t to d
 
-```{r}
+```{r convert t to d}
 
 t_to_d <- prelims_data_fconverted %>% 
   select(effect_size_num, t_score, n_pt, n_comparison) %>% 
@@ -98,7 +98,7 @@ prelims_data_ftconverted <- left_join(prelims_data_fconverted, t_to_d_output, by
 
 ## Convert means/sds to d
 
-```{r}
+```{r convert means and sds to d}
 # Getting dataset of values that do not have 
 mean_sd_data <- prelims_data_ftconverted %>% 
   select(effect_size_num, mean_pt, mean_comparison, sd_pt, 
@@ -123,8 +123,7 @@ We need SD of the DV - which most studies did not provide - in order to convert 
 
 # Other data prep
 
-```{r}
-
+```{r data cleaning}
 meta_data <- converted_data %>%  
   mutate(cohens_d = as.numeric(cohens_d),
          reverse = as.factor(reverse)) %>% 
@@ -166,9 +165,8 @@ meta_data <- converted_data %>%
 
 # Descriptive information about the studies that made it into the meta-analysis
 
-```{r}
+```{r descriptive info before collapsing conditions}
 # Number of papers
-
 meta_data %>% 
   mutate(authors = as.factor(authors)) %>% 
   select(authors) %>% 
@@ -176,28 +174,24 @@ meta_data %>%
   count()
 
 # Number of studies
-
 meta_data %>% 
   select(study_num_total) %>% 
   unique() %>% 
   count()
 
 # Number of unique samples due to some studies having multiple targets
-
 meta_data %>% 
   select(sample_number_total) %>% 
   unique() %>% 
   count()
 
 # Unique effect sizes total
-
 meta_data %>% 
   select(effect_size_num) %>% 
   unique() %>% 
   count()
 
 # Effect sizes per outcome category
-
 meta_data %>% 
   select(dunb, outcome_type) %>% 
   unique() %>% 
@@ -209,13 +203,12 @@ meta_data %>%
                                `3` = "Interpersonal Feelings"))
 ```
 
-## Do we need to collapse perspective taking conditions?
+## Checking if we need to collapse perspective taking conditions
 
 ### Stereotyping outcome
 
-```{r}
+```{r k per condition stereotyping}
 # Number of effect sizes per comparison we coded 
-
 k_per_comparison <- meta_data %>% 
   select(dunb, pt_comparison, outcome_type) %>% 
   unique() %>% 
@@ -249,7 +242,7 @@ Our pre-registered rule was that there must be k = 20 per cell. As this does not
 
 ### Merging/Overlap outcome
 
-```{r}
+```{r k per condition overlap}
 # For overlap/merging outcome
 k_per_comparison %>% 
   filter(outcome_type == 2)
@@ -259,7 +252,7 @@ Due to the lower number of studies in this outcome category, we will have to col
 
 ### Interpersonal feelings outcome
 
-```{r}
+```{r k per condition interpersonal feels}
 # For interpersonal feelings
 k_per_comparison %>% 
   filter(outcome_type == 3)
@@ -269,9 +262,8 @@ We will have to collapse across across "day in the life" and "other" control con
 
 # Overall Meta-analysis
 
-```{r data prep}
+```{r overall meta data prep}
 #collapsing across conditions for data-prep
-
 meta_overall1 <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       pt_v_control = c("1", "2", "5", "6"),
@@ -309,7 +301,7 @@ meta_overall1 %>%
 
 ## Overall meta-analytic effect before we look into theoretical moderators
 
-```{r}
+```{r overall meta no mods}
 meta_overall <- rma.mv(dunb, 
                       var_dunb,
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
@@ -321,7 +313,7 @@ Across perspective taking condition and outcome, there is a small but statiscial
 
 ## Multivariate model with perspective taking only
 
-```{r}
+```{r overall meta pt instruction mod}
 #setting up dummy codes; stereotyping and pt_v_control are the respective comparison groups because they are coded as 1
 contrasts(meta_overall1$pt_comparison) <- contr.treatment(2)
 contrasts(meta_overall1$pt_comparison) 
@@ -339,7 +331,7 @@ The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control)
 
 ## Pre-registered multivariate model with perspective taking and outcome type
 
-```{r}
+```{r overall meta interaction mod}
 contrasts(meta_overall1$outcome_type) <- contr.treatment(3)
 contrasts(meta_overall1$outcome_type) 
 
@@ -354,22 +346,17 @@ meta_multi2
 
 The intercept is when both moderators = 0 (When the pt is compared to the control, and stereotyping is the reference). We are particularly interested in the interaction and estimates. The fifth estimate (pt_comparison2:outcome_type2) represents the change comparison in perspective taking conditions between stereotyping and merging. The sixth comparison represents (pt_comparison2:outcome_type3) comparison in perspective taking conditions between stereotyping and interpersonal feelings.
 
-And these two comparisons are significantly different from one another (in looking up how to use Metafor, it was demonstrated by the creators that it was necessary to do this):
-
-```{r}
-anova(meta_multi2, btt=5:6)
-```
-
 All possible pairwise comparisons:
 
-```{r}
-summary(glht(meta_multi2, linfct=contrMat(c("pt_v_control:Stereotyping"=1,
-                                            "pt_v_control:Overlap"=1,
-                                            "pt_v_control:Interpersonal Feels"=1,
-                                       "pt_v_objective:Stereotyping"=1,
-                                       "pt_v_objective:Overlap"=1,
-                                       "pt_v_objective:Interpersonal Feels"=1), 
-                                       type="Tukey")), 
+```{r pairwise comparisons}
+summary(glht(meta_multi2, 
+             linfct=contrMat(c("pt_v_control:Stereotyping" = 1,
+                               "pt_v_control:Overlap"=1,
+                               "pt_v_control:Interpersonal Feels"=1,
+                               "pt_v_objective:Stereotyping"=1,
+                               "pt_v_objective:Overlap"=1,
+                               "pt_v_objective:Interpersonal Feels" = 1), 
+                                             type="Tukey")), 
         test=adjusted("none"))
 
 ```
@@ -384,7 +371,7 @@ To get the effect sizes for each PT comparison in each outcome that would corres
 
 * PT vs Control in the Stereotyping outcome context
 
-```{r}
+```{r overall model pt vs control stereo}
 control_stereo_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
 
@@ -398,7 +385,7 @@ meta_control_stereo
 
 * PT vs control in the overlap outcome context
 
-```{r}
+```{r overall model pt v control overlap}
 control_overlap_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
 
@@ -412,7 +399,7 @@ meta_control_overlap
 
 * PT vs control in the interpersonal feelings outcome context
 
-```{r}
+```{r overall model pt v control interpersonal}
 control_inter_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
 
@@ -426,7 +413,7 @@ meta_control_inter
 
 * PT vs objective in the stereotyping outcome context
 
-```{r}
+```{r overall model pt v objective stereo}
 obj_stereo_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
 
@@ -440,7 +427,7 @@ meta_obj_stereo
 
 * PT vs objective in the overlap outcome context
 
-```{r}
+```{r overall model pt v objective overlap}
 obj_overlap_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
 
@@ -452,9 +439,9 @@ meta_obj_overlap <- rma.mv(dunb,
 meta_obj_overlap
 ```
 
-* PT vs control in the interpersonal feelings outcome context
+* PT vs Objective in the interpersonal feelings outcome context
 
-```{r}
+```{r overall model pt v objective interpersonal }
 obj_inter_subset <- meta_overall1 %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
 
@@ -468,7 +455,7 @@ meta_obj_inter
 
 Effect size table:
 
-```{r}
+```{r overall model effect size table}
 effect_table <- cbind(label = c("Pt vs Control in Stereotyping", 
                               "PT vs Objective in Stereotyping",
                               "PT vs Control in Overlap",
@@ -510,7 +497,7 @@ Only the comparison of pt_v_control is statistically different from 0 for the Ov
 
 ## Adding in PT unspecified
 
-```{r}
+```{r meta overall ptus data prep}
 meta_overall_ptus <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       pt_v_control = c("1", "2", "5", "6", "10", "11"),
@@ -530,7 +517,7 @@ meta_overall_ptus <- meta_data %>%
 
 ### Overall meta-analytic effect before we look into theoretical moderators with PTUS
 
-```{r}
+```{r meta overall ptus no mods}
 meta_overall_ptus_model <- rma.mv(dunb, 
                       var_dunb,
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
@@ -542,7 +529,7 @@ Slightly larger, but not much different than without adding PT unspecified.
 
 ### Multivariate model with perspective taking only with PTUS
 
-```{r}
+```{r meta overall ptus pt mod}
 #setting up dummy codes; stereotyping and pt_v_control are the respective comparison groups because they are coded as 1
 contrasts(meta_overall_ptus$pt_comparison) <- contr.treatment(2)
 contrasts(meta_overall_ptus$pt_comparison) 
@@ -561,7 +548,7 @@ Pattern did not change - slight increase in intercept estimate (representing pt_
 
 ## Pre-registered multivariate model with perspective taking and outcome type with PTUS
 
-```{r}
+```{r meta overall interaction ptus}
 contrasts(meta_overall_ptus$outcome_type) <- contr.treatment(3)
 contrasts(meta_overall_ptus$outcome_type) 
 
@@ -576,15 +563,9 @@ meta_multi2_ptus
 
 On the interaction (the part that really matters to us), the pattern of results did not change.
 
-Checking if the two interaction effects differ from one another again:
-
-```{r}
-anova(meta_multi2_ptus, btt=5:6)
-```
-
 All possible pairwise comparisons with PTUS included:
 
-```{r}
+```{r pairwise comparisons ptus}
 summary(glht(meta_multi2_ptus, linfct=contrMat(c("pt_v_control:Stereotyping"=1,
                                             "pt_v_control:Overlap"=1,
                                             "pt_v_control:Interpersonal Feels"=1,
@@ -600,7 +581,7 @@ When adding in PTUS, a few more pairwise comparisons become significant or trend
 
 * PT vs Control in the Stereotyping outcome context with PTUS added
 
-```{r}
+```{r overall meta pt v control stereo ptus}
 meta_overall_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
 
@@ -614,7 +595,7 @@ meta_control_stereo_ptus
 
 * PT vs control in the overlap outcome context
 
-```{r}
+```{r overall meta pt v control overlap ptus}
 control_overlap_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
 
@@ -628,7 +609,7 @@ meta_control_overlap_ptus
 
 * PT vs control in the interpersonal feelings outcome context
 
-```{r}
+```{r overall meta pt v control interpersonal ptus}
 control_inter_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
 
@@ -642,7 +623,7 @@ meta_control_inter_ptus
 
 * PT vs objective in the stereotyping outcome context
 
-```{r}
+```{r overall meta pt vs objective stereo ptus}
 obj_stereo_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
 
@@ -656,7 +637,7 @@ meta_obj_stereo_ptus
 
 * PT vs objective in the overlap outcome context
 
-```{r}
+```{r overall meta pt vs objective overlap ptus}
 obj_overlap_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
 
@@ -668,9 +649,9 @@ meta_obj_overlap_ptus <- rma.mv(dunb,
 meta_obj_overlap_ptus
 ```
 
-* PT vs control in the interpersonal feelings outcome context
+* PT vs objective in the interpersonal feelings outcome context
 
-```{r}
+```{r overall meta pt vs objective interpersonal ptus}
 obj_inter_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
 
@@ -684,7 +665,7 @@ meta_obj_inter_ptus
 
 Effect size table with PTUS:
 
-```{r}
+```{r overall meta effect table ptus}
 effect_table_ptus <- cbind(label = c("Pt vs Control in Stereotyping", 
                               "PT vs Objective in Stereotyping",
                               "PT vs Control in Overlap",
@@ -719,4 +700,11 @@ effect_table_ptus
 ```
 
 In comparing the two tables, the only significant difference in effect sizes is that the estimate in "PT vs control" condition in the stereotyping outcome increases from .039 to .101. However, it is still not significantly different from 0. The other estimates are all approximately the same.
+
+# Stereotyping model
+
+```{r}
+
+
+```
 
