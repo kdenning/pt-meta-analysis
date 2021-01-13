@@ -28,9 +28,9 @@ editor_options:
 #install.packages("tinytex")
 #install.packages("compute.es")
 #install.packages("multcomp")
+#install.packages("car")
 library(rio)
 library(here)
-library(tidyverse)
 library(magrittr)
 library(janitor)
 library(lme4)
@@ -40,6 +40,8 @@ library(tinytex)
 library(metafor)
 library(compute.es)
 library(multcomp)
+library(car)
+library(tidyverse)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -124,9 +126,8 @@ converted_data <- left_join(prelims_data_ftconverted, msd_to_d, by = "effect_siz
 
 We need SD of the DV - which most studies did not provide - in order to convert this. We will need to add these studies (k = 21) to our "Contact Authors" sheet if they are not already on there for some reason.
 
+```{r data cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 # Other data prep
-
-```{r data cleaning}
 meta_data <- converted_data %>%  
   mutate(cohens_d = as.numeric(cohens_d),
          reverse = as.factor(reverse)) %>% 
@@ -266,29 +267,37 @@ We will have to collapse across across "day in the life" and "other" control con
 
 # Overall Meta-analysis
 
-```{r overall meta data prep}
+```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
 meta_overall1 <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       pt_v_control = c("1", "2", "5", "6"),
                                       pt_v_objective = c("3", "7"))) %>% 
   filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
-  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
-         dunb = ifelse(outcome_type == "1",
-                       dunb*-1,
-                       ifelse(outcome_type != "1",
-                              dunb*1, NA)),
-         outcome_type = recode(outcome_type,
+  mutate(outcome_type = recode(outcome_type,
                                `3` = "Interpersonal Feels",
                                `2` = "Overlap",
-                               `1` = "Stereotyping")) 
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
+         dunb = ifelse(outcome_type == "Stereotyping",
+                       dunb*-1,
+                       ifelse(outcome_type != "Stereotyping",
+                              dunb*1, NA))) %>% 
+  mutate(outcome_type = fct_relevel(outcome_type, "Interpersonal Feels",
+                                    "Overlap", "Stereotyping"))
+
+meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control"))
+
+# Making sure Interpersonal feels is now the reference level
+levels(meta_data$outcome_type)
 
 #for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
 
-
 # WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
+```
 
-
+```{r effect size overall mod}
 # Effect sizes in overall model
 meta_overall1 %>% 
   dplyr::select(effect_size_num) %>% 
@@ -313,7 +322,7 @@ meta_overall <- rma.mv(dunb,
 meta_overall
 ```
 
-Across perspective taking condition and outcome, there is a small but statiscially significant effect.
+Across perspective taking condition and outcome, there is a small but statistically significant effect.
 
 ## Multivariate model with perspective taking only
 
@@ -331,13 +340,41 @@ meta_multi1 <- rma.mv(dunb,
 meta_multi1
 ```
 
-The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of pt_comparison:pt_v_objective represents the difference in effect sizes compared to the refence level. The summary effect size would be found by adding them together. The moderator test is significant.
+The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of pt_comparison:pt_v_objective represents the difference in effect sizes compared to the reference level. The moderator test is significant.
+
+```{r overall pt v control no outcome}
+meta_overall1_control <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control")
+
+meta_multi1_control <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1_control)
+meta_multi1_control
+
+```
+
+When submitted to only pt v control, effect is not significantly different from 0 and the test for heterogeneity is significant.
+
+```{r overall pt v objective no outcome}
+meta_overall1_objective <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective")
+
+meta_multi1_objective <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1_objective)
+meta_multi1_objective
+
+```
+
+This effect is statistically significant from 0, but heterogeneity is significant.
 
 ## Pre-registered multivariate model with perspective taking and outcome type
 
 ```{r overall meta interaction mod}
 contrasts(meta_overall1$outcome_type) <- contr.treatment(3)
-contrasts(meta_overall1$outcome_type) 
+contrasts(meta_overall1$outcome_type)
 
 # When we include outcome type
 meta_multi2 <- rma.mv(dunb, 
@@ -348,30 +385,25 @@ meta_multi2 <- rma.mv(dunb,
 meta_multi2
 ```
 
-The intercept is when both moderators = 0 (When the pt is compared to the control, and stereotyping is the reference). We are particularly interested in the interaction and estimates. The fifth estimate (pt_comparison2:outcome_type2) represents the change comparison in perspective taking conditions between stereotyping and merging. The sixth comparison represents (pt_comparison2:outcome_type3) comparison in perspective taking conditions between stereotyping and interpersonal feelings.
+The intercept is when both moderators = 0 (When the pt is compared to the objective condition and interpersonal feels is the reference). We are particularly interested in the interaction and estimates. We used interpersonal feels as the reference because it is the the most studied PT subfield - and the one in which a different meta-analysis already exists - and we are curious if the effect of perspective taking is the same across outcome types or differs. We used pt vs objective because, when combined with interpersonal feels, we would expect the largest effect in that cell. Therefore, we are interested if perspective taking in other outcome types follows this same pattern or differs.
 
-All possible pairwise comparisons:
+The "pt_comparison2" contrast supports the theory that I just described. In comparison to the intercept - which represents the effect of pt vs objective in the interpersonal context - the objective control condition shows a decrease of effect size of .33 (this is with interpersonal feels context held constant). With pt v objective held constant and just changing outcome, the overlap outcome did not differ significantly from interpersonal feels (-.26), however, the stereotyping outcome was significantly lower (-.64). 
 
-```{r pairwise comparisons}
-summary(glht(meta_multi2, 
-             linfct=contrMat(c("pt_v_control:Stereotyping" = 1,
-                               "pt_v_control:Overlap"=1,
-                               "pt_v_control:Interpersonal Feels"=1,
-                               "pt_v_objective:Stereotyping"=1,
-                               "pt_v_objective:Overlap"=1,
-                               "pt_v_objective:Interpersonal Feels" = 1), 
-                                             type="Tukey")), 
-        test=adjusted("none"))
+When we look at the interaction we see there are two significant effects for the contrasts. These are not as intuitively interpretable as the main effects. When we vary up both perspective taking and outcome in the fifth estimate (estimate "pt_comparison2:outcome_type2") looking at pt_v_objective in the overlap condition versus pt_v_control in interpersonal feels condition, we see there is a positive and significant change represented by the contrast estimate between the conditions. We also see a significant change that has an even larger positive change in terms of the slope between the pt_v_control and stereotyping condition versus the intercept.
 
+We then ran pairwise comparisons to know the following differences:
+
+* pt_v_control:overlap vs pt_v_control_stereotyping
+
+```{r pairwise comparisons overall meta}
+anova(meta_multi2, btt=5:6)
 ```
 
-We want to answer:
+The two contrasts are significantly different.
 
-Is there an average effect size per comparison, per outcome? This can't be done by dropping the intercept like Wolfgang (creator suggested about non MLM structures) because then the MLM structure does not work. McAuliffe ran individual meta-analyses for each comparison... 
+The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition). The effect sizes for the interaction relate to the contrast, but cannot be used to find the effect.
 
-The multivariate overall model tells us there are statistical differences between context and condition (but does not provide pairwise comparison of merging vs interpersonal feelings), but does not tell us if (by themselves) they differ from 0. The effect sizes it is providing are too confounded by other factors.
-
-To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the dataset (as seen in McAuliffe meta-analysis):
+To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis):
 
 ### Output from individual models to obtain effect sizes per instruction and comparison set:
 
@@ -485,7 +517,7 @@ Only the comparison of pt_v_control is statistically different from 0 for the Ov
 
 For this stereotyping model - like the literature - higher scores/higher effects, indicate more stereotyping. Lower scores indicate less stereotyping (e.g., more stereotype reduction).
 
-```{r stereo model data prep}
+```{r stereo model data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
 ## creating dataset collapsing across "day in the life" versus "other control"
 meta_stereo1 <- meta_data %>% 
@@ -514,7 +546,6 @@ meta_stereo2 <- meta_data %>%
 
 meta_stereo2 %<>% 
   filter(outcome_type == "1")
-  
 ```
 
 ## Number of unique effect sizes
@@ -554,6 +585,22 @@ stereo_meta1
 ```
 
 The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
+
+Theoretically important pairwise comparisons:
+
+* self_v_objective to other_v_objective
+
+```{r pairwise comparisons stereo 2}
+linearHypothesis(stereo_meta1, c(0,1,0,-1))
+```
+
+* other_v_control to other_v_objective
+
+```{r pairwise comparisons stereo 2}
+linearHypothesis(stereo_meta1, c(0,0,1,-1))
+```
+
+Neither are significantly different from one another.
 
 ### Output from individual models to obtain effect sizes per instruction and comparison set:
 
@@ -622,3 +669,82 @@ stereo_effect_table1
 ```
 
 As expected based on the initial model, the estimates are all small and non-significant.
+
+## Model comparing "day in the life," other control, and objective comparisons
+
+```{r stereo model imagine self vs other}
+contrasts(meta_stereo2$pt_comparison) <- contr.treatment(3)
+contrasts(meta_stereo2$pt_comparison) 
+
+# OVerall model across outcome type
+stereo_meta2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2
+```
+
+Pairwise comparisons to compare:
+
+* pt_v_objective to pt_v_other control
+
+```{r pairwise comparisons stereo 2}
+anova(stereo_meta2, btt=2:3)
+```
+
+They do not significantly differ.
+
+### Output from individual models to obtain effect sizes per instruction and comparison set:
+
+```{r stereo day model effect}
+meta_stereo2_day <-meta_stereo2 %>% 
+  filter(pt_comparison == "pt_v_day_control")
+
+stereo_meta2_day <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2_day)
+```
+
+```{r stereo other control model effect}
+meta_stereo2_control <-meta_stereo2 %>% 
+  filter(pt_comparison == "pt_v_other_control")
+
+stereo_meta2_control <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2_control)
+```
+
+```{r stereo objective model effect}
+meta_stereo2_objective <-meta_stereo2 %>% 
+  filter(pt_comparison == "pt_v_objective")
+
+stereo_meta2_objective <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2_objective)
+```
+
+```{r stereo effect table model 2}
+stereo_effect_table2 <- cbind(label = c("pt_v_day_control",
+                                        "pt_v_other_control",
+                                        "pt_v_objective"),
+                              estimate = c(stereo_meta2_day[1],
+                                           stereo_meta2_control[1],
+                                           stereo_meta2_objective[1]),
+                              pvalue = c(stereo_meta2_day[5],
+                                           stereo_meta2_control[5],
+                                           stereo_meta2_objective[5]),
+                              ci_higher = c(stereo_meta2_day[6],
+                                           stereo_meta2_control[6],
+                                           stereo_meta2_objective[6]),
+                              ci_higher = c(stereo_meta2_day[7],
+                                           stereo_meta2_control[7],
+                                           stereo_meta2_objective[7]))
+stereo_effect_table2 
+```
+
+The estimates are, again, all small and non-significant. It is interesting that the effect size are nearly the same between the "day in the life" control and the "other control," arguing against our discussion that they could be different.
