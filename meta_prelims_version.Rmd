@@ -163,8 +163,8 @@ meta_data <- converted_data %>%
          target_out_minor = as.factor(target_out_minor),
          target_adversary = as.factor(target_adversary),
          target_emapthetic_need = as.factor(target_empathetic_need),
-         between_within = as.factor(between_within)) %>% 
-  na.omit()
+         between_within = as.factor(between_within),
+         target_information = as.factor(target_information))
 ```
 
 # Descriptive information about the studies that made it into the meta-analysis
@@ -274,7 +274,7 @@ meta_overall1 <- meta_data %>%
                                       pt_v_control = c("1", "2", "5", "6"),
                                       pt_v_objective = c("3", "7"))) %>% 
   filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
-  mutate(outcome_type = recode(outcome_type,
+  mutate(outcome_type = dplyr::recode(outcome_type,
                                `3` = "Interpersonal Feels",
                                `2` = "Overlap",
                                `1` = "Stereotyping")) %>% 
@@ -513,6 +513,92 @@ Neither perspective taking comparison is significantly different from zero. The 
 
 Only the comparison of pt_v_control is statistically different from 0 for the Overlap/merging category. This is surprising and opposite of the pattern found in the interpersonal feelings category. The comparison of pt_v_objective is marginal, though the estimate itself is not much smaller. This is the category in which the number of studies included is small, which could be impacting these results.
 
+### Sample size moderator analysis
+
+```{r sample moderator overall multi}
+meta_multi3 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_type*n_overall,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_multi3
+```
+
+When we include sample size as a moderator, the interactions found in the previous model disappear, and the effect size for intercept gets larger. The control comparison still remains significantly lower than the objective condition when outcome is held constant. Stereotyping is still significantly lower than interpersonal feelings when perspective taking comparison type remains constant. 
+
+### Target information amount moderator
+
+```{r sample moderator overall multi}
+contrasts(meta_overall1$target_information)
+
+meta_multi4 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_type*target_information,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_multi4
+```
+
+Target information is a variable that measures the amount of descriptive detail that was provided about the target (1 = an impoverished target, often just a photo; 2 = some detail, like a vignette; 3 = highly detailed, like a video or meeting in person). The impoverished target is the reference group.
+
+When included as a moderator, the intercept was still significant, but the intercept estimate had lessened in size. The comparison of stereotyping to the interpersonal feels with pt comparison held still became marginal, while all other effects became NS. Interestingly, a significant three-way interaction with the contrast of "pt_comparison2:outcome_type2:target_information3" became significant with a very large coefficient for the contrast (.88). This contrast is saying there is a significant difference between when people are in pt_v_control in the overlap outcome and the participant is provided a lot of detailed information about the target to when they are in the pt_v_objective condition in the interpersonal feels condition with an impoverished target.
+
+It is interesting that none of the other interactions are significant. It may be an artifact of the interpersonal feels condition having such a large effect normally, that it is difficult for these other conditions to make up for that effect difference with more detailed targets.
+
+I should add effects per comparison cell, but that is too much for the prelims.
+
+Pairwise comparisons:
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type3:target_information2
+
+```{r pairwise comparisons overall meta target info mod 1}
+anova(meta_multi4, btt=15:16)
+```
+
+NS - The difference between these two comparisons is outcome category (merging vs stereotyping), with pt_v_control and medium target information help constant.
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type2:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 2}
+anova(meta_multi4, btt=15:17)
+```
+
+Sig - The difference between these two is target information, they are both the merging outcome category, but one is medium target information and one is detailed.
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type3:target_information3
+
+```{r pairwise comparisons overall meta target info mod 3}
+anova(meta_multi4, btt=15:18)
+```
+
+Sig - There is a significant difference between merging/medium target information and stereotyping/detailed target information.
+
+* pt_comparison2:outcome_type3:target_information2 - pt_comparison2:outcome_type2:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 4}
+anova(meta_multi4, btt=16:17)
+```
+
+NS - These is not a difference when stereotyping has medium target information and it is compared to merging with detailed information and pt_v_control is help constant. This is weird, since the contrast with opposing groupings (stereotyping/high detail vs merging/medium detail).
+
+* pt_comparison2:outcome_type3:target_information2 - pt_comparison2:outcome_type3:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 5}
+anova(meta_multi4, btt=16:18)
+```
+
+NS
+
+* pt_comparison2:outcome_type2:target_information3 - pt_comparison2:outcome_type3:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 5}
+anova(meta_multi4, btt=17:18)
+```
+
+Marginal - When pt_v_control and detailed target information is held constant, there is a difference between merging and stereotyping outcome groups.
+
+### Target category moderator
+
 # Stereotyping model
 
 For this stereotyping model - like the literature - higher scores/higher effects, indicate more stereotyping. Lower scores indicate less stereotyping (e.g., more stereotype reduction).
@@ -528,10 +614,20 @@ meta_stereo1 <- meta_data %>%
                                       other_v_objective = c("7"))) %>% 
   filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
            pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
-  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison))) %>% 
+  mutate(pt_comparison = fct_relevel(pt_comparison, 
+                                     "self_v_objective",
+                                     "self_v_control",
+                                     "other_v_objective",
+                                     "other_v_control"))
+
 
 meta_stereo1 %<>% 
   filter(outcome_type == "1")
+
+mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control"))
+
 
 ## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
 meta_stereo2 <- meta_data %>% 
@@ -588,13 +684,13 @@ The test of moderators is not significant, nor are any comparisons. The estimate
 
 Theoretically important pairwise comparisons:
 
-* self_v_objective to other_v_objective
+* self_v_control to other_v_control
 
 ```{r pairwise comparisons stereo 2}
 linearHypothesis(stereo_meta1, c(0,1,0,-1))
 ```
 
-* other_v_control to other_v_objective
+* other_v_objective to other_v_control
 
 ```{r pairwise comparisons stereo 2}
 linearHypothesis(stereo_meta1, c(0,0,1,-1))
@@ -669,6 +765,44 @@ stereo_effect_table1
 ```
 
 As expected based on the initial model, the estimates are all small and non-significant.
+
+### Sample size moderator 
+
+```{r sample moderator stereo 1}
+stereo_meta1_n <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+stereo_meta1_n
+```
+
+Not significant
+
+### Target group moderator - in-group/out-group
+
+```{r target outgroup moderator stereo 1}
+meta_stereo1 %<>% 
+  mutate(target_out_minor = as.factor(target_out_minor)) %>% 
+  filter(target_out_minor == "1" | target_out_minor == "2")
+
+meta_stereo1 %<>% 
+  mutate(target_out_minor = fct_relevel(target_out_minor,
+                                        "2",
+                                        "1"))
+
+contrasts(meta_stereo1$target_out_minor)
+# 1 = out-group or minority group member; 2 = not; I reorganized the levels so that 2 is the reference group
+
+stereo_meta1_out <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+stereo_meta1_out
+```
+
+Though the test of moderators is significant, none of the estimates are significantly different from one another.
 
 ## Model comparing "day in the life," other control, and objective comparisons
 
@@ -748,3 +882,55 @@ stereo_effect_table2
 ```
 
 The estimates are, again, all small and non-significant. It is interesting that the effect size are nearly the same between the "day in the life" control and the "other control," arguing against our discussion that they could be different.
+
+### Target group moderator - in-group/out-group
+
+```{r target outgroup moderator stereo 2}
+meta_stereo2 %<>% 
+  mutate(target_out_minor = as.factor(target_out_minor)) %>% 
+  filter(target_out_minor == "1" | target_out_minor == "2")
+
+meta_stereo2 %<>% 
+  mutate(target_out_minor = fct_relevel(target_out_minor,
+                                        "1",
+                                        "2"))
+
+contrasts(meta_stereo2$target_out_minor)
+# 1 = out-group or minority group member; 2 = not; Out-group targets are the reference group
+
+stereo_meta_out <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta_out
+```
+
+There are significant main effects now for instruction effect that were not there previously. The interaction is of most theoretical importance. The reference groups are pt_v_day_control and the out-group target, which we can see is significant and medium to large effect size in stereotype reduction. However, both contrasts for the interaction are significantly different from the intercept: pt_v_other_control/in-group and pt_v_objective/in-group target. These contrasts demonstrate there are significantly stronger negative effects in studies comparing both the pt_v_other_control and the pt_v_objective conditions when the targets are not out-group/minority targets. This may seem to support the backfiring literature, or be an artifact that a lot of perspective taking studies are done with elderly targets, which we did not code as out-group or minority.
+
+We also see when running pairwise comparisons of these latter two contrasts that they too are significant from one another.
+
+```{r pairwise comparisons targ out stereo 2}
+anova(stereo_meta_out, btt=5:6)
+```
+
+### Target group moderator - in distress/in need
+
+To check that the distress variable did not moderate because it included the elderly target in it, which it did not.
+
+```{r target outgroup moderator stereo 2}
+meta_stereo2 %<>% 
+  mutate(target_empathetic_need = as.factor(target_empathetic_need))
+
+contrasts(meta_stereo2$target_empathetic_need)
+# 1 = in distress/in need target ; 2 = not; need targets are the reference group
+
+stereo_meta_need <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_empathetic_need,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta_need
+```
