@@ -355,8 +355,9 @@ P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
 I2 <- 100 * sum(meta_overall$sigma2)/ (sum(meta_overall$sigma2) + (meta_overall$k-meta_overall$p)/sum(diag(P)))
 I2
 
+round(100 * (meta_overall$sigma2)/ (sum(meta_overall$sigma2) + (meta_overall$k-meta_overall$p)/sum(diag(P))), digits = 2)
 #Function to get I2
-get_I2 <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
   W <- diag(1/.x$var_dunb)
   X <- model.matrix(.y)
   P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
@@ -365,10 +366,27 @@ get_I2 <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function,
 }
 
 #Check that functions gets same output as above & it does!
-get_I2(meta_overall1, meta_overall)
+get_I2_overall(meta_overall1, meta_overall)
+
+# total variance attributed to between and within-level clusters separately
+## From left to right in every model unless specified:
+## Between sample heterogeneity
+## Between condition heterogeneity
+## Between outcome heterogeneity
+## Hetereogeneity due to outcome type crossed between studies
+
+get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
+  return(I2)
+}
+
+get_I2_var_levels(meta_overall1, meta_overall)
 ```
 
-Across perspective taking condition and outcome, there is a small but statistically significant effect. However, with Q statistically significant and I2 demonstrating that 95% of the total variance is due to heterogeneity, this effect is is pretty much meaningless. We need to look at smaller subsets of data.
+Across perspective taking condition and outcome, there is a small but statistically significant effect. However, with Q statistically significant and I2 demonstrating that 95% of the total variance is due to heterogeneity, this effect is is pretty much meaningless. We need to look at smaller subsets of data. When we break this down by level, we see this is predominantly due to between-study variance (49%) and between outcome variance within-study (25%).
 
 ## Multivariate model with perspective taking only
 
@@ -380,12 +398,13 @@ contrasts(meta_overall1$pt_comparison)
 # OVerall model across outcome type
 meta_multi1 <- rma.mv(dunb, 
                       var_dunb, 
-                      mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+                      mods = ~ pt_comparison - 1,
+                      random = list( ~ pt_comparison| sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ pt_comparison | outcome_scale_group), data = meta_overall1)
 meta_multi1
 
 get_I2(meta_overall1, meta_multi1)
+get_I2_var_levels(meta_overall1, meta_multi1)
 ```
 
 The estimate of intercept represents when pt_comparison = 0 (i.e., pt_v_control). The effect of pt_comparison:pt_v_objective represents the difference in effect sizes compared to the reference level. The moderator test is significant.
@@ -400,7 +419,7 @@ meta_multi1_control <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = meta_overall1_control)
 meta_multi1_control
 
-get_I2(meta_overall1_control, meta_multi1_control)
+get_I2_overall(meta_overall1_control, meta_multi1_control)
 ```
 
 When submitted to only pt v control, effect is not significantly different from 0 and the test for heterogeneity is significant.
@@ -415,7 +434,7 @@ meta_multi1_objective <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = meta_overall1_objective)
 meta_multi1_objective
 
-get_I2(meta_overall1_objective, meta_multi1_objective)
+get_I2_overall(meta_overall1_objective, meta_multi1_objective)
 ```
 
 This effect is statistically significant from 0, but heterogeneity is significant.
@@ -601,6 +620,48 @@ When included as a moderator, the effect of the intercept becomes marginal and a
 
 The comparison of stereotyping to the interpersonal feels with pt comparison held still became marginal, while all other effects became NS. This is interesting that the amount of information removes all effects of perspective taking, but does not significantly predict the effect size itself. It may speak to the large amount of hetereogeneity between the studies. 
 
+# Outcome type moderating each instruction set: Alt interpretation to pre-reg
+
+## Confirmatory: Pt v control
+
+```{r}
+control_sub <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control")
+
+
+control_outcome_mod <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_sub)
+control_outcome_mod
+
+get_I2_overall(control_sub, control_outcome_mod)
+get_I2_var_levels(control_sub, control_outcome_mod)
+
+```
+
+## Confirmatory: Pt v objective
+
+```{r}
+objective_sub <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective")
+
+
+objective_outcome_mod <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = objective_sub)
+objective_outcome_mod
+
+get_I2_overall(objective_sub, objective_outcome_mod)
+get_I2_var_levels(objective_sub, objective_outcome_mod)
+
+```
+
+These get estimates because no interactions by adding slopes to intercept.
+
 # Stereotyping model
 
 For this stereotyping model - like the literature - higher scores/higher effects, indicate more stereotyping. Lower scores indicate less stereotyping (e.g., more stereotype reduction).
@@ -625,7 +686,7 @@ meta_stereo1 <- meta_data %>%
 
 
 meta_stereo1 %<>% 
-  filter(outcome_type == "1")
+  filter(outcome_type == "1" %>% %>% )
 
 mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
                                      "pt_v_control"))
@@ -637,7 +698,7 @@ meta_stereo2 <- meta_data %>%
                                       pt_v_day_control = c("1", "5"),
                                       pt_v_other_control = c("2", "6"),
                                       pt_v_objective = c("3", "7"))) %>% 
-  filter(pt_comparison == "pt_v_day_control" | 
+  filter(pt_comparison == "pt_v_day_control" |
            pt_comparison == "pt_v_other_control" |
            pt_comparison == "pt_v_objective") %>% 
   mutate(pt_comparison = as.factor(droplevels(pt_comparison)))

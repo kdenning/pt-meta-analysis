@@ -1,0 +1,480 @@
+---
+title: "Prelims_Updated"
+author: "Kathryn Denning"
+date: "1/14/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(dmetar)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+# importing data
+prelims_data <- import("prelims_data.xlsx") 
+```
+
+# Convert effect sizes
+
+## Convert F to d
+
+```{r convert F to d}
+f_to_d <- prelims_data %>% 
+  filter(F_score != "NA")
+
+f_to_d_output <- fes(f = F_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = f_to_d) #function drops 95CI when producing table for some reason
+
+f_to_d_output %<>% 
+  mutate(effect_size_num = id,
+         var_d = var.d) %>% 
+  dplyr::select(-c(var.d,id)) %>% 
+  dplyr::select(effect_size_num, d, var_d) 
+
+prelims_data_fconverted <- left_join(prelims_data, f_to_d_output, by = "effect_size_num")
+```
+
+## Convert t to d
+
+```{r convert t to d}
+
+t_to_d <- prelims_data_fconverted %>% 
+  dplyr::select(effect_size_num, t_score, n_pt, n_comparison) %>% 
+  filter(t_score!= "NA")
+
+t_to_d_output <- tes(t = t_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = t_to_d)
+
+t_to_d_output %<>% 
+  dplyr::select(id, d, var.d) %>% 
+  mutate(effect_size_num = id,
+         var_d = var.d) %>% 
+  dplyr::select(-var.d,-id)
+
+
+prelims_data_ftconverted <- left_join(prelims_data_fconverted, t_to_d_output, by = "effect_size_num")
+```
+
+## Convert means/sds to d
+
+```{r convert means and sds to d}
+# Getting dataset of values that do not have 
+mean_sd_data <- prelims_data_ftconverted %>% 
+  dplyr::select(effect_size_num, mean_pt, mean_comparison, sd_pt, 
+         sd_comparison, n_pt, n_comparison, cohens_d, d.x, d.y) %>% 
+  filter(!is.na(mean_pt) & !is.na(mean_comparison) & !is.na(sd_pt) 
+         & !is.na(sd_comparison) & is.na(cohens_d))
+
+msd_to_d <- escalc(measure = "SMD", m1i = mean_pt, m2i = mean_comparison, sd1i = sd_pt, sd2i = sd_comparison, n1i = n_pt, n2i = n_comparison, data = mean_sd_data, vtype = "UB") #since we will have to unbias other cohen's d, told escalc to calculate an unbiased SMD
+
+#yi in the output is SMD, vi is sampling variance
+
+msd_to_d %<>% 
+  dplyr::select(effect_size_num, yi, vi)
+
+prelims_data_ftmeanconverted <- left_join(prelims_data_ftconverted, msd_to_d, by = "effect_size_num")
+
+```
+
+## Convert r to d
+
+```{r convert r to d}
+r_to_d_data <- prelims_data_ftmeanconverted %>% 
+  filter(effect_size_type == "r") %>% 
+  dplyr::select(effect_size_num, effect_size, n_pt, n_comparison) %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+r_to_d_func <- function(.x) {
+  return(effectsize::r_to_d(.x))
+}
+
+d_values <- map(.x = r_to_d_data$effect_size, .f = r_to_d_func)
+
+d_values <- data.frame(unlist(d_values)) %>% 
+  mutate(d_values = unlist.d_values.) %>% 
+  dplyr::select(-unlist.d_values.)
+
+r_to_d_converted <- cbind(r_to_d_data, d_values) %>% 
+  mutate(d_values_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((d_values^2)/(2*(n_pt+n_comparison))))) %>% 
+  dplyr::select(-n_pt, -n_comparison, - effect_size)
+
+converted_data <- left_join(prelims_data_ftmeanconverted, r_to_d_converted, by = "effect_size_num")
+```
+
+## Convert regression coefficients to d
+
+We need SD of the DV - which most studies did not provide - in order to convert this. We will need to add these studies (k = 21) to our "Contact Authors" sheet if they are not already on there for some reason.
+
+```{r data cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Other data prep
+meta_data <- converted_data %>%  
+  mutate(cohens_d = as.numeric(cohens_d),
+         reverse = as.factor(reverse)) %>% 
+  mutate(coded_cohens_d_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((cohens_d^2)/(2*(n_pt+n_comparison))))) %>% #calculated variance by hand for the d's we extracted from articles directly; the ones we converted also came with var calculations
+  pivot_longer(c(cohens_d, d.x, d.y, yi, d_values)) %>% #  Wrangling all converted d's into one column
+  mutate(d = value) %>% 
+  filter(!is.na(d)) %>% 
+  dplyr::select(-c(name, value)) %>% 
+  pivot_longer(c(coded_cohens_d_var, var_d.x, var_d.y, vi, d_values_var)) %>% #wrangling all variances into one column
+  mutate(var = value) %>% 
+  filter(!is.na(var)) %>% 
+  dplyr::select(-c(name, value)) %>% 
+  mutate(df = (n_pt + n_comparison - 2), #getting degrees of freedom
+         J = 1- (3/((4*df)-1)), #calculating hedges correction factor for d unbiased
+         dunb = J*d, #d unbiased
+         var_dunb = ((J^2)*var),  #variance for d unbiased
+         lowCI_dunb = dunb-1.96*sqrt(var_dunb), #getting 95% CI's for d unbiased
+         upCI_dunb  = dunb+1.96*sqrt(var_dunb)) %>% 
+  mutate(dunb = ifelse(reverse == "yes", 
+                       dunb*-1,
+                       ifelse(reverse == "no",
+                              dunb*1, NA))) %>% #reverse scored dunb that needed to be 
+  dplyr::select(-c(DOI, Notes, outcome_description_from_coding, target_long_description,
+            weird_sample, F_score, t_score, effect_size_type,
+            effect_direction, p_value, mean_pt, sd_pt, se_pt, 
+            mean_comparison, sd_comparison,se_comparison, 
+            `Note about directionality of cohen's d`)) %>% 
+  mutate(sample_number_total = as.factor(sample_number_total),
+         pt_comparison = as.factor(pt_comparison),
+         outcome_type = as.factor(outcome_type),
+         target_ingroup_nonspecific = as.factor(target_ingroup_nonspecific),
+         outcome_scale_group = as.factor(outcome_scale_group),
+         target_out_minor = as.factor(target_out_minor),
+         target_adversary = as.factor(target_adversary),
+         target_emapthetic_need = as.factor(target_empathetic_need),
+         between_within = as.factor(between_within),
+         target_information = as.factor(target_information))
+```
+
+# Descriptive information about the studies that made it into the meta-analysis
+
+```{r descriptive info before collapsing conditions}
+# Number of papers
+meta_data %>% 
+  mutate(authors = as.factor(authors)) %>% 
+  dplyr::select(authors) %>% 
+  unique() %>% 
+  count()
+
+# Number of studies
+meta_data %>% 
+  dplyr::select(study_num_total) %>% 
+  unique() %>% 
+  count()
+
+# Number of unique samples due to some studies having multiple targets
+meta_data %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+
+# Unique effect sizes total
+meta_data %>% 
+  dplyr::select(effect_size_num) %>% 
+  unique() %>% 
+  count()
+
+# Effect sizes per outcome category
+meta_data %>% 
+  dplyr::select(dunb, outcome_type) %>% 
+  unique() %>% 
+  group_by(outcome_type) %>% 
+  count() %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `1` = "Stereotyping/Bias",
+                               `2` = "Overlap/Merging",
+                               `3` = "Interpersonal Feelings"))
+```
+
+## Checking if we need to collapse perspective taking conditions
+
+### Stereotyping outcome
+
+```{r k per condition stereotyping}
+# Number of effect sizes per comparison we coded 
+k_per_comparison <- meta_data %>% 
+  dplyr::select(dunb, pt_comparison, outcome_type) %>% 
+  unique() %>% 
+  group_by(pt_comparison, outcome_type) %>% 
+  count() %>% mutate(pt_comparison = dplyr::recode(pt_comparison,
+                                `1` = "Self PT vs Day control",
+                                `2` = "Self PT vs Other control",
+                                `3` = "Self PT vs Objective",
+                                `4` = "Self PT vs Suppression",
+                                `5` = "Other PT vs Day control",
+                                `6` = "Other PT vs Other control",
+                                `7` = "Other PT vs Objective",
+                                `9` = "Other PT vs Self PT",
+                                `10` = "PT US vs Day control",
+                                `11` = "PT US vs other control",
+                                `12` = "PT US vs Objective",
+                                `13` = "PT US vs Suppression"))
+
+# For stereotyping outcome
+k_per_comparison %>% 
+  filter(outcome_type == 1)
+```
+
+Our pre-registered rule was that there must be k = 20 per cell. As this does not apply to every relevant cell, we will need to collapse until we reach this. Also, for the prelims analysis, we will not be adding in perspective taking unspecified (PTUS), but will be adding that to relevant comparisons to see if it affects the analyses for published versions. Also, for all analyses in addition to the meta-analyses specified below, we will conduct moderator analyses with sample size and target information.
+
+For stereotyping, we will do the following:
+
+* Drop any comparison including suppression, as there are not enough even when collapsed (k = 3).
+* We will fun analyses using two of the following comparisons to get at different theoretical comparisons:
+    + We will collapse across the "Day in the life" and "Other" control conditions. This will allow us to analyze Imagine-self versus Imagine-other perspective taking in comparison to a broad control and the objective comparison condition. 
+    + We will then collapse across Imagine-self and Imagine-other to examine the if there is difference between the effect of perspective taking instructions when the comparison is the "Day in the life control" versus "Other control" or objective comparison.
+
+### Merging/Overlap outcome
+
+```{r k per condition overlap}
+# For overlap/merging outcome
+k_per_comparison %>% 
+  filter(outcome_type == 2)
+```
+
+Due to the lower number of studies in this outcome category, we will have to collapse across both Imagine-self and Imagine-other perspective taking instructions as well as "Day in the life" and "Other control" comparisons. As this is the most limiting of the outcomes, we will have to collapse this same way in all outcome categories for the overall meta-analysis when we will include outcome as a predictor.
+
+### Interpersonal feelings outcome
+
+```{r k per condition interpersonal feels}
+# For interpersonal feelings
+k_per_comparison %>% 
+  filter(outcome_type == 3)
+```
+
+We will have to collapse across across "day in the life" and "other" control conditions. As our "Self PT versus Objective" is only one study under our pre-registered limit - and this is a preliminary analysis for a doctoral requirement - we will include that category for this analysis with the expectation that when we include regression coefficients and data from contacted authors, it will be over our limit (spoiler alert: it will). Therefore, for the analysis specifically examining interpersonal feelings outcomes, we will not collapse across Imagine-self and Imagine-other instruction comparisons. 
+
+# Overall Meta-analysis
+
+```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+meta_overall1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
+         dunb = ifelse(outcome_type == "Stereotyping",
+                       dunb*-1,
+                       ifelse(outcome_type != "Stereotyping",
+                              dunb*1, NA))) %>% 
+  mutate(outcome_type = fct_relevel(outcome_type, "Interpersonal Feels",
+                                    "Overlap", "Stereotyping"))
+
+meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control"))
+
+# Making sure Interpersonal feels is now the reference level
+levels(meta_overall1$outcome_type)
+
+#for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
+
+# WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
+```
+
+```{r effect size overall mod}
+# Effect sizes in overall model
+meta_overall1 %>% 
+  dplyr::select(effect_size_num) %>% 
+  unique() %>% 
+  count()
+
+# Effect sizes per comparison and stereotyping category
+meta_overall1 %>% 
+  dplyr::select(dunb, pt_comparison, outcome_type) %>% 
+  unique() %>% 
+  group_by(pt_comparison, outcome_type) %>% 
+  count() 
+```
+
+
+```{r}
+# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
+#Function to get I2
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+# total variance attributed to between and within-level clusters separately
+## From left to right in every model unless specified:
+## Between sample heterogeneity
+## Between condition heterogeneity
+## Between outcome heterogeneity
+## Hetereogeneity due to outcome type crossed between studies
+
+get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
+  return(I2)
+}
+```
+
+# Overall Meta-analysis
+
+## Pre-registered multivariate model with perspective taking and outcome type
+
+```{r overall meta interaction mod}
+contrasts(meta_overall1$outcome_type)
+
+# When we include outcome type
+meta_multi2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+meta_multi2
+get_I2(meta_overall1, meta_multi2)
+```
+
+The intercept is when both moderators = 0 (When the pt is compared to the objective condition and interpersonal feels is the reference). We are particularly interested in the interaction and estimates. We used interpersonal feels as the reference because it is the the most studied PT sub-field - and the one in which a different meta-analysis already exists - and we are curious if the effect of perspective taking is the same across outcome types or differs. We used pt vs objective because, when combined with interpersonal feels, we would expect the largest effect in that cell. Therefore, we are interested if perspective taking in other outcome types follows this same pattern or differs.
+
+The "pt_comparisonpt_v_control" contrast supports the theory that I just described. In comparison to the intercept - which represents the effect of pt vs objective in the interpersonal context - the objective control condition shows a decrease of effect size (this is with interpersonal feels context held constant). With pt v objective held constant and just changing outcome, the overlap outcome did not differ significantly from interpersonal feels, however, the stereotyping outcome was significantly lower. 
+
+When we look at the interaction we see there is only one significant effect for the contrast. This is not as intuitively interpretable as the main effects. When we vary up both perspective taking and outcome in the fifth estimate (estimate "pt_comparisonpt_v_control:outcome_typeOverlap") looking at pt_v_objective in the overlap condition versus pt_v_control in interpersonal feels condition, we see there there is not a significant difference from the intercept. We do see a significant change in which the slope of the contrast demonstrates a positive increase between the pt_v_control and stereotyping condition versus the intercept.
+
+We then ran pairwise comparisons to know the following differences:
+
+* pt_v_control:overlap vs pt_v_control_stereotyping
+
+```{r pairwise comparisons overall meta}
+anova(meta_multi2, btt=5:6)
+```
+
+The two contrasts are significantly different.
+
+The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition). The effect sizes for the interaction relate to the contrast, but cannot be used to find the effect.
+
+To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis).
+
+## Effect sizes per instruction comparison, collapsed acrosss outcome, as baseline
+
+## Pt v control
+
+
+```{r overall pt v control no outcome}
+meta_overall1_control <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control")
+
+meta_multi1_control <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1_control)
+meta_multi1_control
+
+get_I2_overall(meta_overall1_control, meta_multi1_control)
+```
+
+When submitted to only pt v control, effect is not significantly different from 0 and the test for heterogeneity is significant.
+
+### Pt v objective
+
+```{r overall pt v objective no outcome}
+meta_overall1_objective <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective")
+
+meta_multi1_objective <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_overall1_objective)
+meta_multi1_objective
+
+get_I2_overall(meta_overall1_objective, meta_multi1_objective)
+```
+
+This effect is statistically significant from 0, but heterogeneity is significant.
+
+## Outcome type moderating each instruction set
+
+### Pt v control
+
+```{r}
+control_sub <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control")
+
+
+control_outcome_mod <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_sub)
+control_outcome_mod
+
+get_I2_overall(control_sub, control_outcome_mod)
+get_I2_var_levels(control_sub, control_outcome_mod)
+
+```
+
+### Pt v objective
+
+```{r}
+objective_sub <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective")
+
+
+objective_outcome_mod <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ outcome_type,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = objective_sub)
+objective_outcome_mod
+
+get_I2_overall(objective_sub, objective_outcome_mod)
+get_I2_var_levels(objective_sub, objective_outcome_mod)
+
+```
+
+Because of the significant heterogeneity that is moderated by outcome type, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
+
+# Stereotyping Meta-analysis
