@@ -355,6 +355,16 @@ P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
 I2 <- 100 * sum(meta_overall$sigma2)/ (sum(meta_overall$sigma2) + (meta_overall$k-meta_overall$p)/sum(diag(P)))
 I2
 
+#Function to get I2
+get_I2 <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+get_I2(meta_overall1, meta_overall)
 ```
 
 Across perspective taking condition and outcome, there is a small but statistically significant effect. However, with Q statistically significant and I2 demonstrating that 95% of the total variance is due to heterogeneity, this effect is is pretty much meaningless. We need to look at smaller subsets of data.
