@@ -116,6 +116,57 @@ meta_control_overlap_ptus <- rma.mv(dunb,
 ```{r overall meta pt v control interpersonal ptus}
 control_inter_subset_ptus <- meta_overall_ptus %>% 
   filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
+```
+
+Pairwise comparisons:
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type3:target_information2
+
+```{r pairwise comparisons overall meta target info mod 1}
+anova(meta_multi4, btt=15:16)
+```
+
+NS - The difference between these two comparisons is outcome category (merging vs stereotyping), with pt_v_control and medium target information help constant.
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type2:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 2}
+anova(meta_multi4, btt=15:17)
+```
+
+Sig - The difference between these two is target information, they are both the merging outcome category, but one is medium target information and one is detailed.
+
+* pt_comparison2:outcome_type2:target_information2 - pt_comparison2:outcome_type3:target_information3
+
+```{r pairwise comparisons overall meta target info mod 3}
+anova(meta_multi4, btt=15:18)
+```
+
+Sig - There is a significant difference between merging/medium target information and stereotyping/detailed target information.
+
+* pt_comparison2:outcome_type3:target_information2 - pt_comparison2:outcome_type2:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 4}
+anova(meta_multi4, btt=16:17)
+```
+
+NS - These is not a difference when stereotyping has medium target information and it is compared to merging with detailed information and pt_v_control is help constant. This is weird, since the contrast with opposing groupings (stereotyping/high detail vs merging/medium detail).
+
+* pt_comparison2:outcome_type3:target_information2 - pt_comparison2:outcome_type3:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 5}
+anova(meta_multi4, btt=16:18)
+```
+
+NS
+
+* pt_comparison2:outcome_type2:target_information3 - pt_comparison2:outcome_type3:target_information3 
+
+```{r pairwise comparisons overall meta target info mod 5}
+anova(meta_multi4, btt=17:18)
+```
+
+Marginal - When pt_v_control and detailed target information is held constant, there is a difference between merging and stereotyping outcome groups.
 
 
 meta_control_inter_ptus <- rma.mv(dunb, 
