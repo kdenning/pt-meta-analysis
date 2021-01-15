@@ -1,5 +1,5 @@
 ---
-title: "Prelims_Updated"
+title: "Multivariate Results"
 author: "Kathryn Denning"
 date: "1/14/2021"
 output: html_document
@@ -186,6 +186,9 @@ meta_data <- converted_data %>%
          target_emapthetic_need = as.factor(target_empathetic_need),
          between_within = as.factor(between_within),
          target_information = as.factor(target_information))
+
+# Saving a clean version of data to be read in different R files
+write.csv(meta_data, "meta_data.csv")
 ```
 
 # Descriptive information about the studies that made it into the meta-analysis
@@ -333,8 +336,7 @@ meta_overall1 %>%
   count() 
 ```
 
-
-```{r}
+```{r I2 functions}
 # Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
 #Function to get I2
 get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
@@ -375,7 +377,9 @@ meta_multi2 <- rma.mv(dunb,
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
                                     ~ 1 | outcome_scale_group), data = meta_overall1)
 meta_multi2
-get_I2(meta_overall1, meta_multi2)
+
+get_I2_overall(meta_overall1, meta_multi2)
+get_I2_var_levels(meta_overall1, meta_multi2)
 ```
 
 The intercept is when both moderators = 0 (When the pt is compared to the objective condition and interpersonal feels is the reference). We are particularly interested in the interaction and estimates. We used interpersonal feels as the reference because it is the the most studied PT sub-field - and the one in which a different meta-analysis already exists - and we are curious if the effect of perspective taking is the same across outcome types or differs. We used pt vs objective because, when combined with interpersonal feels, we would expect the largest effect in that cell. Therefore, we are interested if perspective taking in other outcome types follows this same pattern or differs.
@@ -398,83 +402,136 @@ The interactions in the multivariate overall model tells us there are statistica
 
 To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis).
 
-## Effect sizes per instruction comparison, collapsed acrosss outcome, as baseline
+### Output from individual models to obtain effect sizes per instruction and comparison set:
 
-## Pt v control
+```{r overall model pt vs control stereo}
+control_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
 
 
-```{r overall pt v control no outcome}
-meta_overall1_control <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_control")
-
-meta_multi1_control <- rma.mv(dunb, 
+meta_control_stereo <- rma.mv(dunb, 
                       var_dunb, 
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = meta_overall1_control)
-meta_multi1_control
+                                    ~ 1 | outcome_scale_group), data = control_stereo_subset )
 
-get_I2_overall(meta_overall1_control, meta_multi1_control)
+stereo_control_I2 <- get_I2_overall(control_stereo_subset, meta_control_stereo)
 ```
 
-When submitted to only pt v control, effect is not significantly different from 0 and the test for heterogeneity is significant.
+```{r overall model pt v control overlap}
+control_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
 
-### Pt v objective
 
-```{r overall pt v objective no outcome}
-meta_overall1_objective <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_objective")
-
-meta_multi1_objective <- rma.mv(dunb, 
+meta_control_overlap <- rma.mv(dunb, 
                       var_dunb, 
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = meta_overall1_objective)
-meta_multi1_objective
+                                    ~ 1 | outcome_scale_group), data = control_overlap_subset)
 
-get_I2_overall(meta_overall1_objective, meta_multi1_objective)
+overlap_control_I2 <- get_I2_overall(control_overlap_subset, meta_control_overlap)
 ```
 
-This effect is statistically significant from 0, but heterogeneity is significant.
-
-## Outcome type moderating each instruction set
-
-### Pt v control
-
-```{r}
-control_sub <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_control")
+```{r overall model pt v control interpersonal}
+control_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
 
 
-control_outcome_mod <- rma.mv(dunb, 
+meta_control_inter <- rma.mv(dunb, 
                       var_dunb, 
-                      mods = ~ outcome_type,
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = control_sub)
-control_outcome_mod
+                                    ~ 1 | outcome_scale_group), data = control_inter_subset)
 
-get_I2_overall(control_sub, control_outcome_mod)
-get_I2_var_levels(control_sub, control_outcome_mod)
-
+inter_control_I2 <- get_I2_overall(control_inter_subset, meta_control_inter)
 ```
 
-### Pt v objective
-
-```{r}
-objective_sub <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_objective")
+```{r overall model pt v objective stereo}
+obj_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
 
 
-objective_outcome_mod <- rma.mv(dunb, 
+meta_obj_stereo <- rma.mv(dunb, 
                       var_dunb, 
-                      mods = ~ outcome_type,
                       random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = objective_sub)
-objective_outcome_mod
+                                    ~ 1 | outcome_scale_group), data = obj_stereo_subset)
 
-get_I2_overall(objective_sub, objective_outcome_mod)
-get_I2_var_levels(objective_sub, objective_outcome_mod)
-
+stereo_object_I2 <- get_I2_overall(obj_stereo_subset, meta_obj_stereo)
 ```
 
-Because of the significant heterogeneity that is moderated by outcome type, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
+```{r overall model pt v objective overlap}
+obj_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
+
+
+meta_obj_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_overlap_subset)
+
+overlap_object_I2 <- get_I2_overall(obj_overlap_subset, meta_obj_overlap)
+```
+
+```{r overall model pt v objective interpersonal }
+obj_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
+
+
+meta_obj_inter <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_inter_subset)
+
+inter_object_I2 <- get_I2_overall(obj_inter_subset, meta_obj_inter)
+```
+
+```{r overall model effect size table}
+effect_table <- cbind(label = c("Pt vs Control in Stereotyping", 
+                              "PT vs Objective in Stereotyping",
+                              "PT vs Control in Overlap",
+                              "PT vs Cobjective in Overlap",
+                              "PT vs Control in Interpersonal feelings",
+                              "PT vs Objective in Interpersonal feelings"),
+                      estimate = c(meta_control_stereo[1],
+                                 meta_obj_stereo[1],
+                                 meta_control_overlap[1],
+                                 meta_obj_overlap[1],
+                                 meta_control_inter[1],
+                                 meta_obj_inter[1]),
+                      pvalue = c(meta_control_stereo[5],
+                                 meta_obj_stereo[5],
+                                 meta_control_overlap[5],
+                                 meta_obj_overlap[5],
+                                 meta_control_inter[5],
+                                 meta_obj_inter[5]),
+                      ci_upper = c(meta_control_stereo[6],
+                                 meta_obj_stereo[6],
+                                 meta_control_overlap[6],
+                                 meta_obj_overlap[6],
+                                 meta_control_inter[6],
+                                 meta_obj_inter[6]),
+                      ci_lower = c(meta_control_stereo[7],
+                                 meta_obj_stereo[7],
+                                 meta_control_overlap[7],
+                                 meta_obj_overlap[7],
+                                 meta_control_inter[7],
+                                 meta_obj_inter[7]),
+                      I2 = c(stereo_control_I2[1],
+                             stereo_object_I2[1],
+                             overlap_control_I2[1],
+                             overlap_object_I2[1],
+                             inter_control_I2[1],
+                             inter_object_I2[1]))
+
+effect_table
+```
+
+The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction. 
+
+*Note for Sara: This change from before for imagine-other vs no-instructions in the interpersonal feels category is due to me adding three effect sizes converted from correlation coefficients that I had previously forgot to convert... I guess they were outliers, since it increased from .16 to .27*
+
+
+For the categories other than Interpersonal Feels, only the comparison of pt_v_control is statistically different from 0 for the Overlap/merging category. This is surprising and opposite of the pattern found in the interpersonal feelings category. The comparison of pt_v_objective is marginal, though the estimate itself is not much smaller. This is the category in which the number of studies included is small, which could be impacting these results. We will have to see if these differ from each other when analyzed in their own model.
+
+
+Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
 # Stereotyping Meta-analysis
+

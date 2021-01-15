@@ -1,0 +1,161 @@
+---
+title: "Stereotyping Model"
+author: "Kathryn Denning"
+date: "1/14/2021"
+output: html_document
+---
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(dmetar)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+# importing data
+prelims_data <- import("meta_data.csv") 
+```
+
+```{r I2 functions}
+# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
+#Function to get I2
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+# total variance attributed to between and within-level clusters separately
+## From left to right in every model unless specified:
+## Between sample heterogeneity
+## Between condition heterogeneity
+## Between outcome heterogeneity
+## Hetereogeneity due to outcome type crossed between studies
+
+get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
+  return(I2)
+}
+```
+
+```{r data prep for dataset for multivariate results, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+meta_overall1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
+         dunb = ifelse(outcome_type == "Stereotyping",
+                       dunb*-1,
+                       ifelse(outcome_type != "Stereotyping",
+                              dunb*1, NA))) %>% 
+  mutate(outcome_type = fct_relevel(outcome_type, "Interpersonal Feels",
+                                    "Overlap", "Stereotyping"))
+
+meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control"))
+
+# Making sure Interpersonal feels is now the reference level
+levels(meta_overall1$outcome_type)
+
+#for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
+
+# WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
+```
+
+# Stereotyping results PT vs Control & PT vs Objective Conditions
+
+As demonstrated by the results of the individual models performed in the multivariate analysis, the perspective taking effects collapsed across across Imagine self vs other as well as Day in the life vs control condition instructions were not significant and were highly heterogenous. You can see the results printed again below.
+
+```{r overall model pt vs control stereo}
+control_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
+
+
+meta_control_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_stereo_subset )
+
+stereo_control_I2 <- get_I2_overall(control_stereo_subset, meta_control_stereo)
+```
+
+```{r overall model pt v objective stereo}
+obj_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
+
+
+meta_obj_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_stereo_subset)
+
+stereo_object_I2 <- get_I2_overall(obj_stereo_subset, meta_obj_stereo)
+```
+
+```{r overall model effect size table}
+effect_table_collapsed <- cbind(label = c("Pt vs Control in Stereotyping", 
+                              "PT vs Objective in Stereotyping"),
+                      estimate = c(meta_control_stereo[1],
+                                 meta_obj_stereo[1]),
+                      pvalue = c(meta_control_stereo[5],
+                                 meta_obj_stereo[5]),
+                      ci_upper = c(meta_control_stereo[6],
+                                 meta_obj_stereo[6]),
+                      ci_lower = c(meta_control_stereo[7],
+                                 meta_obj_stereo[7]),
+                      I2 = c(stereo_control_I2[1],
+                             stereo_object_I2[1]))
+
+effect_table_collapsed
+```

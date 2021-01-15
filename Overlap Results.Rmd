@@ -1,0 +1,385 @@
+---
+title: "Overlap Results"
+author: "Kathryn Denning"
+date: "1/14/2021"
+output: html_document
+---
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(dmetar)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+# importing data
+prelims_data <- import("meta_data.csv") 
+```
+
+```{r I2 functions}
+# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
+#Function to get I2
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+# total variance attributed to between and within-level clusters separately
+## From left to right in every model unless specified:
+## Between sample heterogeneity
+## Between condition heterogeneity
+## Between outcome heterogeneity
+## Hetereogeneity due to outcome type crossed between studies
+
+get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
+  return(I2)
+}
+```
+
+```{r data prep for dataset for multivariate results, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+meta_overall1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
+         dunb = ifelse(outcome_type == "Stereotyping",
+                       dunb*-1,
+                       ifelse(outcome_type != "Stereotyping",
+                              dunb*1, NA))) %>% 
+  mutate(outcome_type = fct_relevel(outcome_type, "Interpersonal Feels",
+                                    "Overlap", "Stereotyping"))
+
+meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control"))
+
+# Making sure Interpersonal feels is now the reference level
+levels(meta_overall1$outcome_type)
+
+#for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
+
+# WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
+```
+
+```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+overlap_data <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control")) %>% 
+  filter(outcome_type == "Overlap")
+```
+
+# Overlap
+
+## Number of effects:
+
+Number of overall effects:
+
+```{r effects overlap data}
+overlap_data %>% 
+  count()
+```
+
+Effects per comparison group:
+
+```{r effects pt overlap data}
+overlap_data %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+## Results for PT vs Control & PT vs Objective from Multivariate Model
+
+```{r multi results pt v control overlap}
+control_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
+
+
+meta_control_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_overlap_subset)
+
+overlap_control_I2 <- get_I2_overall(control_overlap_subset, meta_control_overlap)
+```
+
+```{r multi results pt v objective overlap}
+obj_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
+
+
+meta_obj_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_overlap_subset)
+
+overlap_object_I2 <- get_I2_overall(obj_overlap_subset, meta_obj_overlap)
+```
+
+```{r overall model effect size table}
+multi_effects <- cbind(label = c("PT vs Control in Overlap",
+                              "PT vs objective in Overlap"),
+                      estimate = c(meta_control_overlap[1],
+                                 meta_obj_overlap[1]),
+                      pvalue = c(meta_control_overlap[5],
+                                 meta_obj_overlap[5]),
+                      ci_upper = c(meta_control_overlap[6],
+                                 meta_obj_overlap[6]),
+                      ci_lower = c(meta_control_overlap[7],
+                                 meta_obj_overlap[7]),
+                      I2 = c(overlap_control_I2[1],
+                             overlap_object_I2[1]))
+
+multi_effects 
+```
+
+As demonstrated from this model, PT vs control is significantly different from 0, but PT vs objective is only marginal - though their estimates are very similar. The heterogeneity for both was significant, though it is much higher in the PT vs Control model. With heterogeneity this high, these results can not be trusted as representing the true effect.
+
+## Comparing the two in one model
+
+```{r overlap model pt}
+overlap_pt <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt
+
+get_I2_var_levels(overlap_data, overlap_pt)
+get_I2_overall(overlap_data, overlap_pt)
+```
+To look at the difference between the two conditions since the estimates are so close, we see they are not significantly different from 0. When included in the same model, the intercept is no longer significantly different from 0, which represents (pt_v_objective). The heterogeneity again is so high, though, these results can not be trusted.
+
+### Moderator sample size
+
+```{r overlap model sample size}
+overlap_pt_n <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_n
+
+get_I2(overlap_data, overlap_pt_n)
+```
+
+Nothing is significant
+
+### Moderator target information
+
+```{r overlap model sample size}
+overlap_pt_targinfo <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_targinfo
+
+get_I2(overlap_data, overlap_pt_targinfo)
+```
+
+### Moderator target in need variable
+
+```{r overlap model in need}
+overlap_pt_targdescrip1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_empathetic_need,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_targdescrip1
+
+get_I2(overlap_data, overlap_pt_targdescrip1)
+```
+
+### Moderator target out-group
+
+```{r overlap model out}
+overlap_pt_targdescrip2 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_targdescrip2
+
+get_I2(overlap_data, overlap_pt_targdescrip2)
+```
+
+### Moderator target adversary
+
+```{r overlap model adversary}
+overlap_pt_targdescrip3 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_adversary,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_targdescrip3
+
+get_I2(overlap_data, overlap_pt_targdescrip3)
+```
+
+### Moderator target in-group
+
+```{r overlap model targ in}
+
+overlap_data %<>% 
+  filter(target_ingroup_nonspecific == "1" | target_ingroup_nonspecific == "2")
+
+overlap_pt_targdescrip4 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_ingroup_nonspecific,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_targdescrip4
+
+get_I2(overlap_data, overlap_pt_targdescrip4)
+```
+
+### Moderator of scale
+
+```{r overlap model scale}
+
+overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
+contrasts(overlap_data$outcome_scale_group)
+
+overlap_pt_scale <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt_scale
+
+get_I2(overlap_data, overlap_pt_scale)
+```
+
+#### Per subset of scale
+
+```{r}
+overlap_data %>% 
+  select(effect_size_num, pt_comparison, outcome_scale_group) %>% 
+  group_by(pt_comparison, outcome_scale_group) %>% 
+  count()
+
+objective_ios <- overlap_data %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_scale_group == "7")
+
+overlap_objective_ios <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var), data = objective_ios)
+
+overlap_objective_ios
+
+get_I2(objective_ios, overlap_objective_ios)
+```
+
+```{r}
+
+control_ios <- overlap_data %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_scale_group == "7")
+
+overlap_control_ios <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var), data = control_ios)
+
+overlap_control_ios
+
+get_I2(control_ios, overlap_control_ios)
+```
+
+
+```{r}
+control_attribution <- overlap_data %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_scale_group == "8")
+
+overlap_control_attribution <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var), data = control_attribution)
+
+overlap_control_attribution
+
+get_I2(control_attribution, overlap_control_attribution)
+```
+
+```{r}
+objective_attribution <- overlap_data %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_scale_group == "8")
+
+overlap_objective_attribution <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var), data = objective_attribution)
+
+overlap_objective_attribution
+
+get_I2(objective_attribution, overlap_objective_attribution)
+```
+
+Heterogeneity is good but k is small
