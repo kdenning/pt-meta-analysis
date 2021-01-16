@@ -243,3 +243,119 @@ effect_table_ptus
 ```
 
 In comparing the two tables, the only significant difference in effect sizes is that the estimate in "PT vs control" condition in the stereotyping outcome increases from .039 to .101. However, it is still not significantly different from 0. The other estimates are all approximately the same.
+
+# Code from when I wrote every all multi models by hand
+
+```{r overall model pt vs control stereo}
+control_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
+
+meta_control_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_stereo_subset )
+
+stereo_control_I2 <- get_I2_overall(control_stereo_subset, meta_control_stereo)
+get_I2_var_levels(control_stereo_subset, meta_control_stereo)
+```
+
+```{r overall model pt v control overlap}
+control_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
+
+meta_control_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_overlap_subset)
+
+overlap_control_I2 <- get_I2_overall(control_overlap_subset, meta_control_overlap)
+```
+
+```{r overall model pt v control interpersonal}
+control_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
+
+meta_control_inter <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = control_inter_subset)
+
+inter_control_I2 <- get_I2_overall(control_inter_subset, meta_control_inter)
+```
+
+```{r overall model pt v objective stereo}
+obj_stereo_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
+
+meta_obj_stereo <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_stereo_subset)
+
+stereo_object_I2 <- get_I2_overall(obj_stereo_subset, meta_obj_stereo)
+```
+
+```{r overall model pt v objective overlap}
+obj_overlap_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
+
+meta_obj_overlap <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_overlap_subset)
+
+overlap_object_I2 <- get_I2_overall(obj_overlap_subset, meta_obj_overlap)
+```
+
+```{r overall model pt v objective interpersonal }
+obj_inter_subset <- meta_overall1 %>% 
+  filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
+
+meta_obj_inter <- rma.mv(dunb, 
+                      var_dunb, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = obj_inter_subset)
+
+inter_object_I2 <- get_I2_overall(obj_inter_subset, meta_obj_inter)
+```
+
+```{r overall model effect size table}
+effect_table <- cbind(label = c("Pt vs Control in Stereotyping", 
+                              "PT vs Objective in Stereotyping",
+                              "PT vs Control in Overlap",
+                              "PT vs Cobjective in Overlap",
+                              "PT vs Control in Interpersonal feelings",
+                              "PT vs Objective in Interpersonal feelings"),
+                      estimate = c(meta_control_stereo[1],
+                                 meta_obj_stereo[1],
+                                 meta_control_overlap[1],
+                                 meta_obj_overlap[1],
+                                 meta_control_inter[1],
+                                 meta_obj_inter[1]),
+                      pvalue = c(meta_control_stereo[5],
+                                 meta_obj_stereo[5],
+                                 meta_control_overlap[5],
+                                 meta_obj_overlap[5],
+                                 meta_control_inter[5],
+                                 meta_obj_inter[5]),
+                      ci_upper = c(meta_control_stereo[6],
+                                 meta_obj_stereo[6],
+                                 meta_control_overlap[6],
+                                 meta_obj_overlap[6],
+                                 meta_control_inter[6],
+                                 meta_obj_inter[6]),
+                      ci_lower = c(meta_control_stereo[7],
+                                 meta_obj_stereo[7],
+                                 meta_control_overlap[7],
+                                 meta_obj_overlap[7],
+                                 meta_control_inter[7],
+                                 meta_obj_inter[7]),
+                      I2 = c(stereo_control_I2[1],
+                             stereo_object_I2[1],
+                             overlap_control_I2[1],
+                             overlap_object_I2[1],
+                             inter_control_I2[1],
+                             inter_object_I2[1]))
+
+effect_table
+```

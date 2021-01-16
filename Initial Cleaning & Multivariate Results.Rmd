@@ -54,8 +54,59 @@ trace(grDevices:::png, quote({
   }
 }), print = FALSE)
 
+options(scipen=999)
+
 # importing data
 prelims_data <- import("prelims_data.xlsx") 
+```
+
+```{r functions I wrote for this doc}
+# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
+#Function to get I2
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+# total variance attributed to between and within-level clusters separately
+## From left to right in every model unless specified:
+## Between sample heterogeneity
+## Between condition heterogeneity
+## Between outcome heterogeneity
+## Hetereogeneity due to outcome type crossed between studies
+
+get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
+  return(I2)
+}
+
+# Functions to extract values from rma.mv output; needed to help when cleaning my nested output
+get_pval_rma <- function(x){
+  x$pval
+}
+
+get_ci_ub_rma <- function(x){
+  x$ci.ub
+}
+
+get_ci_lb_rma <- function(x){
+  x$ci.lb
+}
+
+get_Q_rma <- function(x){
+  x$QE
+}
+
+get_Q_p_rma <- function(x){
+  x$QEp
+}
+
 ```
 
 # Convert effect sizes
@@ -336,32 +387,6 @@ meta_overall1 %>%
   count() 
 ```
 
-```{r I2 functions}
-# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
-#Function to get I2
-get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
-  W <- diag(1/.x$var_dunb)
-  X <- model.matrix(.y)
-  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
-  return(I2)
-}
-
-# total variance attributed to between and within-level clusters separately
-## From left to right in every model unless specified:
-## Between sample heterogeneity
-## Between condition heterogeneity
-## Between outcome heterogeneity
-## Hetereogeneity due to outcome type crossed between studies
-
-get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
-  W <- diag(1/.x$var_dunb)
-  X <- model.matrix(.y)
-  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
-  return(I2)
-}
-```
 
 # Overall Meta-analysis
 
@@ -404,193 +429,140 @@ To get the effect sizes for each PT comparison in each outcome that would corres
 
 ### Output from individual models to obtain effect sizes per instruction and comparison set:
 
-```{r}
-# practice on one - works!
-pt_filter_prac <- c("pt_v_control")
-outcome_filter_prac <- c("Stereotyping")
-
-subset_prac <- meta_overall1 %>% 
-  filter(pt_comparison == pt_filter_prac[1] & outcome_type == outcome_filter_prac[1])
-
-
-# For loop itself works!
+```{r meta models per multi subsets with I2}
+# Get subsets of the overall dataset corresponding to each comparison
+## Get labels for the filter in the for loop corresponding to each comparison
 pt_filter1 <- c("pt_v_control", "pt_v_control", "pt_v_control", 
                   "pt_v_objective", "pt_v_objective", "pt_v_objective") 
 
 outcome_filter1 <- c("Stereotyping", "Overlap", "Interpersonal Feels",
                      "Stereotyping", "Overlap", "Interpersonal Feels")
 
+## Get an empty list the length of the number of subsetted datasets we need
 df_4_overall <- list(length = length(pt_filter1))
 
-
+## The for loop getting us subsetted datasets
 for (i in seq_along(pt_filter1)){
   df_4_overall[[i]] <- meta_overall1 %>%
     filter(pt_comparison == pt_filter1[i] & 
              outcome_type == outcome_filter1[i])
   }
 
+# Mapping over each subsetted dataset to run the meta-analysis
 meta_output <- map(df_4_overall, ~rma.mv(dunb,
                          var_dunb,
                          random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
                                         ~ 1 | outcome_scale_group),
                          data = .x))
+# Mapping over the output of each meta-analysis to get I2 values
+## Overall I2 value for model
+I2_overall_output <- data.frame(map2(df_4_overall, meta_output, ~get_I2_overall(.x, .y))) %>% 
+  pivot_longer(1:6) %>% 
+  mutate(I2_overall = value) %>% 
+  select(-value, -name)
 
-I2_list <- list(length = length(meta_output))
+##I2 value per level of nested and crossed variance
+I2_var_levels <-map2(df_4_overall, meta_output, ~get_I2_var_levels(.x, .y))
 
-#NOT WORKING - somehow adding results to function to create non-conformable arguments
-for (i in seq_along(df_4_overall)){
-  data = df_4_overall[[i]]
-   for (j in seq_along(meta_output)){
-    output = meta_output[[j]]
-    I2_list[[i]] <- get_I2_overall(data, output)
-   }
-}
- 
-get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
-  W <- diag(1/.x$var_dunb)
-  X <- model.matrix(.y)
-  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
-  return(I2)
+### Getting values for bewteen study into dataframe column to put in table later
+between_study_I2 <- list(length = length(I2_var_levels))
+
+for (i in seq_along(I2_var_levels)){
+ between_study_I2[[i]] <- I2_var_levels[[i]][1]
 }
 
+btw_study_I2 <- data.frame(between_study_I2) %>% 
+  pivot_longer(1:6) %>% 
+  mutate(I2_btw_study = value) %>% 
+  select(-value, -name)
 
-# Can we make a function to call on later?
-get_filtered <- function(.x, .y, .z) {
-  
-  data <- .x
-  pt_filter <- .y
-  outcome_filter <- .z
-  
-  for (i in seq_along(pt_filter)){
-    df_4_overall[[i]] <- data %>% 
-      filter(pt_comparison == pt_filter[i] & 
-               outcome_type == outcome_filter[i])
-  }
+### Getting values for between outcome into dataframe column to put in table later
+within_study_I2 <- list(length = length(I2_var_levels))
+
+for (i in seq_along(I2_var_levels)){
+ within_study_I2[[i]] <- I2_var_levels[[i]][2]
 }
 
+within_I2 <- data.frame(within_study_I2) %>% 
+  pivot_longer(1:6) %>% 
+  mutate(I2_within = value) %>% 
+  select(-value, -name)
 
+### Getting values for crossed scale into dataframe column to put in table later
 
-get_filtered(meta_overall1, pt_filter1, outcome_filter1)
-```
+cross_measure_I2 <- list(length = length(I2_var_levels))
 
-```{r overall model pt vs control stereo}
-control_stereo_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_control" & outcome_type == "Stereotyping")
+for (i in seq_along(I2_var_levels)){
+ cross_measure_I2[[i]] <- I2_var_levels[[i]][2]
+}
 
+cross_I2 <- data.frame(cross_measure_I2) %>% 
+  pivot_longer(1:6) %>% 
+  mutate(I2_crossed = value) %>% 
+  select(-value, -name)
 
-meta_control_stereo <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = control_stereo_subset )
+# Mapping over each model to pull out the data so we can put it into one dataframe
+estimates <- map(meta_output, ~coef(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(estimate = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 3)
 
-stereo_control_I2 <- get_I2_overall(control_stereo_subset, meta_control_stereo)
-```
+pval <- map(meta_output, ~get_pval_rma(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(est_pval = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 3)
 
-```{r overall model pt v control overlap}
-control_overlap_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_control" & outcome_type == "Overlap")
+ci_upper <- map(meta_output, ~get_ci_ub_rma(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(ci_upper = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 3)
 
+ci_lower <- map(meta_output, ~get_ci_lb_rma(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(ci_lower = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 3)
 
-meta_control_overlap <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = control_overlap_subset)
+Q_val <- map(meta_output, ~get_Q_rma(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(Q = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 3)
 
-overlap_control_I2 <- get_I2_overall(control_overlap_subset, meta_control_overlap)
-```
+Q_pval <- map(meta_output, ~get_Q_p_rma(.x)) %>% 
+  as.data.frame() %>% 
+  pivot_longer(1:6) %>% 
+  mutate(Q_pval = value) %>% 
+  dplyr::select(-name, - value) %>% 
+  round(digits = 4)
 
-```{r overall model pt v control interpersonal}
-control_inter_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_control" & outcome_type == "Interpersonal Feels")
+# Creating the labels for the dataframe
+comparison <- c("Pt vs Control in Stereotyping",
+                "PT vs Control in Overlap",
+                "PT vs Control in Interpersonal feelings",
+                "PT vs Objective in Stereotyping",
+                "PT vs Objective in Overlap",
+                "PT vs Objective in Interpersonal feelings")
 
-
-meta_control_inter <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = control_inter_subset)
-
-inter_control_I2 <- get_I2_overall(control_inter_subset, meta_control_inter)
-```
-
-```{r overall model pt v objective stereo}
-obj_stereo_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_objective" & outcome_type == "Stereotyping")
-
-
-meta_obj_stereo <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = obj_stereo_subset)
-
-stereo_object_I2 <- get_I2_overall(obj_stereo_subset, meta_obj_stereo)
-```
-
-```{r overall model pt v objective overlap}
-obj_overlap_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_objective" & outcome_type == "Overlap")
-
-
-meta_obj_overlap <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = obj_overlap_subset)
-
-overlap_object_I2 <- get_I2_overall(obj_overlap_subset, meta_obj_overlap)
-```
-
-```{r overall model pt v objective interpersonal }
-obj_inter_subset <- meta_overall1 %>% 
-  filter(pt_comparison == "pt_v_objective" & outcome_type == "Interpersonal Feels")
-
-
-meta_obj_inter <- rma.mv(dunb, 
-                      var_dunb, 
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = obj_inter_subset)
-
-inter_object_I2 <- get_I2_overall(obj_inter_subset, meta_obj_inter)
-```
-
-```{r overall model effect size table}
-effect_table <- cbind(label = c("Pt vs Control in Stereotyping", 
-                              "PT vs Objective in Stereotyping",
-                              "PT vs Control in Overlap",
-                              "PT vs Cobjective in Overlap",
-                              "PT vs Control in Interpersonal feelings",
-                              "PT vs Objective in Interpersonal feelings"),
-                      estimate = c(meta_control_stereo[1],
-                                 meta_obj_stereo[1],
-                                 meta_control_overlap[1],
-                                 meta_obj_overlap[1],
-                                 meta_control_inter[1],
-                                 meta_obj_inter[1]),
-                      pvalue = c(meta_control_stereo[5],
-                                 meta_obj_stereo[5],
-                                 meta_control_overlap[5],
-                                 meta_obj_overlap[5],
-                                 meta_control_inter[5],
-                                 meta_obj_inter[5]),
-                      ci_upper = c(meta_control_stereo[6],
-                                 meta_obj_stereo[6],
-                                 meta_control_overlap[6],
-                                 meta_obj_overlap[6],
-                                 meta_control_inter[6],
-                                 meta_obj_inter[6]),
-                      ci_lower = c(meta_control_stereo[7],
-                                 meta_obj_stereo[7],
-                                 meta_control_overlap[7],
-                                 meta_obj_overlap[7],
-                                 meta_control_inter[7],
-                                 meta_obj_inter[7]),
-                      I2 = c(stereo_control_I2[1],
-                             stereo_object_I2[1],
-                             overlap_control_I2[1],
-                             overlap_object_I2[1],
-                             inter_control_I2[1],
-                             inter_object_I2[1]))
-
-effect_table
+# Combinind everything into one dataframe
+cbind(data.frame(comparison), 
+      data.frame(estimates),
+      data.frame(pval),
+      data.frame(ci_upper),
+      data.frame(ci_lower),
+      data.frame(Q_val),
+      data.frame(Q_pval),
+      btw_study_I2,
+      within_I2,
+      cross_I2)
 ```
 
 The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction. 
