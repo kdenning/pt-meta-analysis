@@ -374,10 +374,10 @@ contrasts(meta_overall1$outcome_type)
 meta_multi2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_type,
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
                                     ~ 1 | outcome_scale_group), data = meta_overall1)
-meta_multi2
 
+meta_multi2
 get_I2_overall(meta_overall1, meta_multi2)
 get_I2_var_levels(meta_overall1, meta_multi2)
 ```
@@ -403,6 +403,76 @@ The interactions in the multivariate overall model tells us there are statistica
 To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis).
 
 ### Output from individual models to obtain effect sizes per instruction and comparison set:
+
+```{r}
+# practice on one - works!
+pt_filter_prac <- c("pt_v_control")
+outcome_filter_prac <- c("Stereotyping")
+
+subset_prac <- meta_overall1 %>% 
+  filter(pt_comparison == pt_filter_prac[1] & outcome_type == outcome_filter_prac[1])
+
+
+# For loop itself works!
+pt_filter1 <- c("pt_v_control", "pt_v_control", "pt_v_control", 
+                  "pt_v_objective", "pt_v_objective", "pt_v_objective") 
+
+outcome_filter1 <- c("Stereotyping", "Overlap", "Interpersonal Feels",
+                     "Stereotyping", "Overlap", "Interpersonal Feels")
+
+df_4_overall <- list(length = length(pt_filter1))
+
+
+for (i in seq_along(pt_filter1)){
+  df_4_overall[[i]] <- meta_overall1 %>%
+    filter(pt_comparison == pt_filter1[i] & 
+             outcome_type == outcome_filter1[i])
+  }
+
+meta_output <- map(df_4_overall, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+
+I2_list <- list(length = length(meta_output))
+
+#NOT WORKING - somehow adding results to function to create non-conformable arguments
+for (i in seq_along(df_4_overall)){
+  data = df_4_overall[[i]]
+   for (j in seq_along(meta_output)){
+    output = meta_output[[j]]
+    I2_list[[i]] <- get_I2_overall(data, output)
+   }
+}
+ 
+get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
+  W <- diag(1/.x$var_dunb)
+  X <- model.matrix(.y)
+  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
+  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
+  return(I2)
+}
+
+
+# Can we make a function to call on later?
+get_filtered <- function(.x, .y, .z) {
+  
+  data <- .x
+  pt_filter <- .y
+  outcome_filter <- .z
+  
+  for (i in seq_along(pt_filter)){
+    df_4_overall[[i]] <- data %>% 
+      filter(pt_comparison == pt_filter[i] & 
+               outcome_type == outcome_filter[i])
+  }
+}
+
+
+
+get_filtered(meta_overall1, pt_filter1, outcome_filter1)
+```
 
 ```{r overall model pt vs control stereo}
 control_stereo_subset <- meta_overall1 %>% 
