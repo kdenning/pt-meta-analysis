@@ -57,280 +57,11 @@ trace(grDevices:::png, quote({
 options(scipen=999)
 
 # importing data
-prelims_data <- import("prelims_data.xlsx") 
+converted_data <- import("converted_data.csv") 
+
+# Importing functions I wrote from R document in this project
+source("meta_functions.R")
 ```
-
-```{r functions I wrote for this doc}
-# Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
-#Function to get I2
-get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
-  W <- diag(1/.x$var_dunb)
-  X <- model.matrix(.y)
-  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-  I2 <- 100 * sum(.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P)))
-  return(I2)
-}
-
-# And getting it cleaned per a list of results
-
-get_I2_overall_clean <- function(x, y){ #x is data that was mapped, y is meta results
-  I2 <- data.frame(map2(x, y, ~get_I2_overall(.x, .y)))
-  I2 %>% 
-    pivot_longer(1:ncol(I2)) %>% 
-    mutate(I2_overall = value) %>% 
-    select(-value, -name)
-}
-
-# total variance attributed to between and within-level clusters separately
-## From left to right in every model unless specified:
-## Between sample heterogeneity
-## Between condition heterogeneity
-## Between outcome heterogeneity
-## Hetereogeneity due to outcome type crossed between studies
-
-get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
-  W <- diag(1/.x$var_dunb)
-  X <- model.matrix(.y)
-  P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-  I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
-  return(I2)
-}
-
-# Get column for between study hetereogeneity to put in table
-get_btw_study_I2 <- function(x){#x is output from function that gets I2 var levels per study
-  between_study_I2 <- list(length = length(x))
-  
-  for (i in seq_along(x)){
-    between_study_I2[[i]] <- x[[i]][1]
-    }
-  
-  btw_study_I2 <- data.frame(between_study_I2) 
-  btw_study_I2 %>% 
-    pivot_longer(1:ncol(btw_study_I2)) %>% 
-    mutate(I2_btw_study = value) %>% 
-    select(-value, -name)
-}
-
-# Get column for within study heterogeneity
-get_within_study_I2 <- function(x){#ne meta-analyses with three-level nesting structure, this woudl correspond to within-study variance (within-outcome variance)
-  within_study_I2 <- list(length = length(x))
-  
-  for (i in seq_along(x)){
-    within_study_I2[[i]] <- x[[i]][2]
-    }
-  
-  within_I2 <- data.frame(within_study_I2) 
-  within_I2 %>% 
-    pivot_longer(1:ncol(within_I2)) %>% 
-    mutate(I2_within_study = value) %>% 
-    select(-value, -name)
-}
-
-### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-
-get_crossed_study_I2 <- function(x){#x is output from function that gets I2 var levels per study
-  crossed_study_I2 <- list(length = length(x))
-  
-  for (i in seq_along(x)){
-    crossed_study_I2[[i]] <- x[[i]][3]
-    }
-  
-  crossed_I2 <- data.frame(crossed_study_I2) 
-  crossed_I2 %>% 
-    pivot_longer(1:ncol(crossed_I2)) %>% 
-    mutate(I2_crossed_scale = value) %>% 
-    select(-value, -name)
-}
-
-# Function that subsets data into multiple datasets based on two filters & runs an rma.mv meta-analysis 
-filtered_meta <- function(x, y, z){ #x is the overall dataset, y is the first set of filters, z is the second set of filters
-  df <- list(length = length(y))
-  
-  for (i in seq_along(y)){
-  df[[i]] <- x %>%
-    dplyr::filter(pt_comparison == y[i] & 
-                    outcome_type == z[i])
-  }
-  
-  return(map(df, ~rma.mv(dunb,
-                  var_dunb,
-                  random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
-                                                ~ 1 | outcome_scale_group),
-                  data = .x)))
-}
-
-# Functions to extract values from rma.mv output; needed to help when cleaning my nested output
-get_pval_rma <- function(x){
-  x$pval
-}
-
-get_ci_ub_rma <- function(x){
-  x$ci.ub
-}
-
-get_ci_lb_rma <- function(x){
-  x$ci.lb
-}
-
-get_Q_rma <- function(x){
-  x$QE
-}
-
-get_Q_p_rma <- function(x){
-  x$QEp
-}
-
-# Functions to clean values extracted from rma.mv output
-
-get_ests_clean <- function(x){
-  est <- map(x, ~coef(.x)) %>% 
-  as.data.frame()
-  est %>% 
-    pivot_longer(1:ncol(est)) %>% 
-    mutate(estimate = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 3)
-}
-
-get_pval_clean <- function(x){#x is data frame
-  pvals <- map(x, ~get_pval_rma(.x)) %>% 
-  as.data.frame()
-  pvals %>% 
-    pivot_longer(1:ncol(pvals)) %>% 
-    mutate(est_pval = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 3)  
-}
-
-get_ci_upper_clean <- function(x) {
-  uppers <- map(x, ~get_ci_ub_rma(.x)) %>% 
-  as.data.frame()
-  uppers %>% 
-    pivot_longer(1:ncol(uppers)) %>% 
-    mutate(ci_upper = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 3)
-}
-
-get_ci_lower_clean <- function(x) {
-  lower <- map(x, ~get_ci_lb_rma(.x)) %>% 
-  as.data.frame()
-  lower %>% 
-    pivot_longer(1:ncol(lower)) %>% 
-    mutate(ci_upper = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 3)
-}
-
-get_Q_clean <- function(x){
-  Q <- map(x, ~get_Q_rma(.x)) %>% 
-  as.data.frame()
-  Q %>% 
-    pivot_longer(1:ncol(Q)) %>% 
-    mutate(Q = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 3)
-}
-
-get_Q_p_clean <- function(x){
-  Q_ps <- map(x, ~get_Q_p_rma(.x)) %>% 
-  as.data.frame()
-  Q_ps %>% 
-    pivot_longer(1:ncol(Q_ps)) %>% 
-    mutate(Q_pval = value) %>% 
-    dplyr::select(-name, - value) %>% 
-    round(digits = 4)
-}
-```
-
-# Convert effect sizes
-
-## Convert F to d
-
-```{r convert F to d}
-f_to_d <- prelims_data %>% 
-  filter(F_score != "NA")
-
-f_to_d_output <- fes(f = F_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = f_to_d) #function drops 95CI when producing table for some reason
-
-f_to_d_output %<>% 
-  mutate(effect_size_num = id,
-         var_d = var.d) %>% 
-  dplyr::select(-c(var.d,id)) %>% 
-  dplyr::select(effect_size_num, d, var_d) 
-
-prelims_data_fconverted <- left_join(prelims_data, f_to_d_output, by = "effect_size_num")
-```
-
-## Convert t to d
-
-```{r convert t to d}
-
-t_to_d <- prelims_data_fconverted %>% 
-  dplyr::select(effect_size_num, t_score, n_pt, n_comparison) %>% 
-  filter(t_score!= "NA")
-
-t_to_d_output <- tes(t = t_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = t_to_d)
-
-t_to_d_output %<>% 
-  dplyr::select(id, d, var.d) %>% 
-  mutate(effect_size_num = id,
-         var_d = var.d) %>% 
-  dplyr::select(-var.d,-id)
-
-
-prelims_data_ftconverted <- left_join(prelims_data_fconverted, t_to_d_output, by = "effect_size_num")
-```
-
-## Convert means/sds to d
-
-```{r convert means and sds to d}
-# Getting dataset of values that do not have 
-mean_sd_data <- prelims_data_ftconverted %>% 
-  dplyr::select(effect_size_num, mean_pt, mean_comparison, sd_pt, 
-         sd_comparison, n_pt, n_comparison, cohens_d, d.x, d.y) %>% 
-  filter(!is.na(mean_pt) & !is.na(mean_comparison) & !is.na(sd_pt) 
-         & !is.na(sd_comparison) & is.na(cohens_d))
-
-msd_to_d <- escalc(measure = "SMD", m1i = mean_pt, m2i = mean_comparison, sd1i = sd_pt, sd2i = sd_comparison, n1i = n_pt, n2i = n_comparison, data = mean_sd_data, vtype = "UB") #since we will have to unbias other cohen's d, told escalc to calculate an unbiased SMD
-
-#yi in the output is SMD, vi is sampling variance
-
-msd_to_d %<>% 
-  dplyr::select(effect_size_num, yi, vi)
-
-prelims_data_ftmeanconverted <- left_join(prelims_data_ftconverted, msd_to_d, by = "effect_size_num")
-
-```
-
-## Convert r to d
-
-```{r convert r to d}
-r_to_d_data <- prelims_data_ftmeanconverted %>% 
-  filter(effect_size_type == "r") %>% 
-  dplyr::select(effect_size_num, effect_size, n_pt, n_comparison) %>% 
-  mutate(effect_size = as.numeric(effect_size))
-
-r_to_d_func <- function(.x) {
-  return(effectsize::r_to_d(.x))
-}
-
-d_values <- map(.x = r_to_d_data$effect_size, .f = r_to_d_func)
-
-d_values <- data.frame(unlist(d_values)) %>% 
-  mutate(d_values = unlist.d_values.) %>% 
-  dplyr::select(-unlist.d_values.)
-
-r_to_d_converted <- cbind(r_to_d_data, d_values) %>% 
-  mutate(d_values_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((d_values^2)/(2*(n_pt+n_comparison))))) %>% 
-  dplyr::select(-n_pt, -n_comparison, - effect_size)
-
-converted_data <- left_join(prelims_data_ftmeanconverted, r_to_d_converted, by = "effect_size_num")
-```
-
-## Convert regression coefficients to d
-
-We need SD of the DV - which most studies did not provide - in order to convert this. We will need to add these studies (k = 21) to our "Contact Authors" sheet if they are not already on there for some reason.
 
 ```{r data cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 # Other data prep
@@ -371,9 +102,6 @@ meta_data <- converted_data %>%
          target_emapthetic_need = as.factor(target_empathetic_need),
          between_within = as.factor(between_within),
          target_information = as.factor(target_information))
-
-# Saving a clean version of data to be read in different R files
-write.csv(meta_data, "meta_data.csv")
 ```
 
 # Descriptive information about the studies that made it into the meta-analysis
@@ -590,21 +318,22 @@ meta_output <- map(df_4_overall, ~rma.mv(dunb,
                          data = .x))
 
 # Overall I2 value for model
-get_I2_overall_clean(df_4_overall, meta_output)
+I2_overall_multi <- get_I2_overall_clean(df_4_overall, meta_output)
 
 # I2 value per level of nested and crossed variance
 I2_var_levels <-map2(df_4_overall, meta_output, ~get_I2_var_levels(.x, .y))
 
 ### Get column for between study hetereogeneity to put in table
-get_btw_study_I2(I2_var_levels)
+btw_I2_multi <- get_btw_study_I2(I2_var_levels)
 
 ### Getting values for between outcome hetereogeneity (within outcome) for dataframe
-get_within_study_I2(I2_var_levels)
+within_I2_multi <- get_within_study_I2(I2_var_levels)
 
 ### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-get_crossed_study_I2(I2_var_levels) 
+crossed_I2_multi <- get_crossed_study_I2(I2_var_levels) 
 
 #Using extraction and cleaning functions I wrote, extract and clean data from model output
+k <- get_k_clean(meta_output)
 estimates <- get_ests_clean(meta_output)
 pval <- get_pval_clean(meta_output)
 ci_upper <- get_ci_upper_clean(meta_output)
@@ -622,15 +351,17 @@ comparison <- c("Pt vs Control in Stereotyping",
 
 # Combinind everything into one dataframe
 cbind(data.frame(comparison), 
+      k,
       data.frame(estimates),
       data.frame(pval),
       data.frame(ci_upper),
       data.frame(ci_lower),
       data.frame(Q_val),
       data.frame(Q_pval),
-      btw_study_I2,
-      within_I2,
-      cross_I2)
+      I2_overall_multi,
+      btw_I2_multi,
+      within_I2_multi,
+      crossed_I2_multi)
 ```
 
 The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction. 
@@ -662,11 +393,8 @@ meta_stereo1 <- meta_data %>%
                                      "self_v_control",
                                      "other_v_objective",
                                      "other_v_control"))
-
-
 meta_stereo1 %<>% 
   filter(outcome_type == "1")
-
 
 ## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
 meta_stereo2 <- meta_data %>% 
@@ -699,17 +427,18 @@ contrasts(meta_stereo1$pt_comparison)
 stereo_meta1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
                                     ~ 1 | outcome_scale_group), data = meta_stereo1)
 
 stereo_meta1
 
 get_I2_overall(meta_stereo1, stereo_meta1)
+get_I2_var_levels(meta_stereo1, stereo_meta1)
 ```
 
 The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
 
-## Estimates for each comparison
+### Estimates for each comparison
 
 ```{r meta models for stereo 1 subsets}
 # Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
@@ -750,6 +479,7 @@ within_I2_stereo1 <- get_within_study_I2(I2_var_levels_stereo1)
 crossed_I2_stereo1 <- get_crossed_study_I2(I2_var_levels_stereo1) 
 
 #Using extraction and cleaning functions I wrote, extract and clean data from model output
+k_stereo1 <- get_k_clean(stereosub_output1)
 estimates_stereo1 <- get_ests_clean(stereosub_output1)
 pval_stereo1 <- get_pval_clean(stereosub_output1)
 ci_upper_stereo1 <- get_ci_upper_clean(stereosub_output1)
@@ -763,6 +493,275 @@ comparison_stereo1 <- c("self_v_objective", "self_v_control",
 
 # Combinind everything into one dataframe
 cbind(comparison_stereo1, 
+      k_stereo1,
+      estimates_stereo1,
+      pval_stereo1,
+      ci_upper_stereo1,
+      ci_lower_stereo1,
+      Q_val_stereo1,
+      Q_pval_stereo1,
+      I2_overall_stereo1,
+      btw_I2_stereo1,
+      within_I2_stereo1,
+      crossed_I2_stereo1)
+```
+
+## Model comparing "day in the life," other control, and objective comparisons
+
+```{r stereo model imagine self vs other}
+contrasts(meta_stereo2$pt_comparison) 
+
+# OVerall model across outcome type
+stereo_meta2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2
+
+get_I2_var_levels(meta_stereo2, stereo_meta2)
+```
+
+Pairwise comparisons to compare:
+
+* pt_v_objective to pt_v_other control
+
+```{r pairwise comparisons stereo 2}
+anova(stereo_meta2, btt=2:3)
+```
+
+They do not significantly differ.
+
+### Estimates for each comparison
+
+```{r meta models for stereo 2 subsets}
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function
+stereo_pt_filter2 <- c("pt_v_day_control", "pt_v_other_control",
+                       "pt_v_objective") 
+
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_stereo2 <- list(length = length(stereo_pt_filter2))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(stereo_pt_filter2)){ # change () in seq_along to filters
+  df_4_stereo2[[i]] <- meta_stereo2 %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
+    filter(pt_comparison == stereo_pt_filter2[i]) # change () in seq_along to filters
+  }
+
+# Mapping over each subsetted dataset to run the meta-analysis
+stereosub_output2 <- map(df_4_stereo2, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+
+# Overall I2 value for model
+I2_overall_stereo2 <- get_I2_overall_clean(df_4_stereo2, stereosub_output2)
+
+# I2 value per level of nested and crossed variance
+I2_var_levels_stereo2 <-map2(df_4_stereo2, stereosub_output2, ~get_I2_var_levels(.x, .y))
+
+### Get column for between study hetereogeneity to put in table
+btw_I2_stereo2 <- get_btw_study_I2(I2_var_levels_stereo2)
+
+### Getting values for between outcome hetereogeneity (within outcome) for dataframe
+within_I2_stereo2 <- get_within_study_I2(I2_var_levels_stereo2)
+
+### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
+crossed_I2_stereo2 <- get_crossed_study_I2(I2_var_levels_stereo2) 
+
+#Using extraction and cleaning functions I wrote, extract and clean data from model output
+k_stereo2 <- get_k_clean(stereosub_output2)
+estimates_stereo2 <- get_ests_clean(stereosub_output2)
+pval_stereo2 <- get_pval_clean(stereosub_output2)
+ci_upper_stereo2 <- get_ci_upper_clean(stereosub_output2)
+ci_lower_stereo2 <- get_ci_lower_clean(stereosub_output2)
+Q_val_stereo2 <- get_Q_clean(stereosub_output2)
+Q_pval_stereo2 <- get_Q_p_clean(stereosub_output2)
+
+# Creating the labels for the dataframe
+comparison_stereo2 <- c("pt_v_day_control", "pt_v_other_control",
+                       "pt_v_objective") 
+
+# Combinind everything into one dataframe
+cbind(comparison_stereo2, 
+      k_stereo2,
+      estimates_stereo2,
+      pval_stereo2,
+      ci_upper_stereo2,
+      ci_lower_stereo2,
+      Q_val_stereo2,
+      Q_pval_stereo2,
+      I2_overall_stereo2,
+      btw_I2_stereo2,
+      within_I2_stereo2,
+      crossed_I2_stereo2)
+```
+
+# Overlap
+
+```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+overlap_data <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control")) %>% 
+  filter(outcome_type == "Overlap")
+```
+
+Number of overall effects:
+
+```{r effects overlap data}
+overlap_data %>% 
+  count()
+```
+
+Effects per comparison group:
+
+```{r effects pt overlap data}
+overlap_data %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+## Comparing PT comparisons in one model without other outcomes
+
+```{r overlap model pt}
+overlap_pt <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt
+
+get_I2_var_levels(overlap_data, overlap_pt)
+get_I2_overall(overlap_data, overlap_pt)
+```
+
+Since this comparison is the same as the overall multivariate model, we already have the subsetted dataset results per each comparison.
+
+# Interpersonal Feelings
+
+```{r}
+feels <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      self_v_control = c("1", "2"),
+                                      self_v_objective = c("3"),
+                                      other_v_control = c( "6"),# there are no day in the life controls in the interpersonal feels category
+                                      other_v_objective = c("7"))) %>% 
+  filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
+           pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison))) %>% 
+  mutate(pt_comparison = fct_relevel(pt_comparison, 
+                                     "self_v_objective",
+                                     "self_v_control",
+                                     "other_v_objective",
+                                     "other_v_control"))
+feels %<>% 
+  filter(outcome_type == "3")
+
+```
+
+Number of overall effects:
+
+```{r number of effect sizes feels}
+feels %>% 
+  count()
+```
+
+Effects per comparison group:
+
+```{r effects pt feels data}
+feels %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims.
+
+## Comparing PT comparisons in one model without other outcomes
+
+```{r overlap model pt}
+contrasts(feels$pt_comparison)
+
+feels_model <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = feels)
+
+feels_model
+
+get_I2_var_levels(feels, feels_model)
+get_I2_overall(feels, feels_model)
+```
+
+
+
+### Estimates for each comparison
+
+```{r meta models for stereo 1 subsets}
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function
+comparisons_feels <- c("self_v_objective", "self_v_control", 
+                      "other_v_objective", "other_v_control") 
+
+
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_feels <- list(length = length(comparisons_feels))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(comparisons_feels)){ # change () in seq_along to filters
+  df_4_feels[[i]] <- feels %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
+    filter(pt_comparison == comparisons_feels[i]) # change () in seq_along to filters
+  }
+
+# Mapping over each subsetted dataset to run the meta-analysis
+feels_sub_output <- map(df_4_feels, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+
+# Overall I2 value for model
+I2_overall_feels <- get_I2_overall_clean(df_4_feels, feels_sub_output)
+
+# I2 value per level of nested and crossed variance
+I2_var_levels_feels <-map2(df_4_feels, feels_sub_output, ~get_I2_var_levels(.x, .y))
+
+### Get column for between study hetereogeneity to put in table
+btw_I2_feels <- get_btw_study_I2(I2_var_levels_feels)
+
+### Getting values for between outcome hetereogeneity (within outcome) for dataframe
+within_I2_feels <- get_within_study_I2(I2_var_levels_feels)
+
+### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
+crossed_I2_feels <- get_crossed_study_I2(I2_var_levels_feels) 
+
+#Using extraction and cleaning functions I wrote, extract and clean data from model output
+k_feels <- get_k_clean(feels_sub_output)
+estimates_feels <- get_ests_clean(feels_sub_output)
+pval_feels <- get_pval_clean(feels_sub_output)
+ci_upper_feels <- get_ci_upper_clean(feels_sub_output)
+ci_lower_feels <- get_ci_lower_clean(feels_sub_output)
+Q_val_feels <- get_Q_clean(feels_sub_output)
+Q_pval_feels <- get_Q_p_clean(feels_sub_output)
+
+# Combinind everything into one dataframe
+cbind(comparisons_feels, 
+      k_feels,
       estimates_stereo1,
       pval_stereo1,
       ci_upper_stereo1,

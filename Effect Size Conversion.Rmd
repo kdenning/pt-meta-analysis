@@ -1,0 +1,153 @@
+---
+title: "Effect size conversion"
+author: "Kathryn Denning"
+date: "1/17/2021"
+output: html_document
+---
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(dmetar)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+options(scipen=999)
+
+# importing data
+prelims_data <- import("prelims_data.xlsx") 
+```
+
+# Convert effect sizes
+
+## Convert F to d
+
+```{r convert F to d}
+f_to_d <- prelims_data %>% 
+  filter(F_score != "NA")
+
+f_to_d_output <- fes(f = F_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = f_to_d) #function drops 95CI when producing table for some reason
+
+f_to_d_output %<>% 
+  mutate(effect_size_num = id,
+         var_d = var.d) %>% 
+  dplyr::select(-c(var.d,id)) %>% 
+  dplyr::select(effect_size_num, d, var_d) 
+
+prelims_data_fconverted <- left_join(prelims_data, f_to_d_output, by = "effect_size_num")
+```
+
+## Convert t to d
+
+```{r convert t to d}
+
+t_to_d <- prelims_data_fconverted %>% 
+  dplyr::select(effect_size_num, t_score, n_pt, n_comparison) %>% 
+  filter(t_score!= "NA")
+
+t_to_d_output <- tes(t = t_score, n.1 = n_pt, n.2 = n_comparison, level = 95, id = effect_size_num, data = t_to_d)
+
+t_to_d_output %<>% 
+  dplyr::select(id, d, var.d) %>% 
+  mutate(effect_size_num = id,
+         var_d = var.d) %>% 
+  dplyr::select(-var.d,-id)
+
+
+prelims_data_ftconverted <- left_join(prelims_data_fconverted, t_to_d_output, by = "effect_size_num")
+```
+
+## Convert means/sds to d
+
+```{r convert means and sds to d}
+# Getting dataset of values that do not have 
+mean_sd_data <- prelims_data_ftconverted %>% 
+  dplyr::select(effect_size_num, mean_pt, mean_comparison, sd_pt, 
+         sd_comparison, n_pt, n_comparison, cohens_d, d.x, d.y) %>% 
+  filter(!is.na(mean_pt) & !is.na(mean_comparison) & !is.na(sd_pt) 
+         & !is.na(sd_comparison) & is.na(cohens_d))
+
+msd_to_d <- escalc(measure = "SMD", m1i = mean_pt, m2i = mean_comparison, sd1i = sd_pt, sd2i = sd_comparison, n1i = n_pt, n2i = n_comparison, data = mean_sd_data, vtype = "UB") #since we will have to unbias other cohen's d, told escalc to calculate an unbiased SMD
+
+#yi in the output is SMD, vi is sampling variance
+
+msd_to_d %<>% 
+  dplyr::select(effect_size_num, yi, vi)
+
+prelims_data_ftmeanconverted <- left_join(prelims_data_ftconverted, msd_to_d, by = "effect_size_num")
+
+```
+
+## Convert r to d
+
+```{r convert r to d}
+r_to_d_data <- prelims_data_ftmeanconverted %>% 
+  filter(effect_size_type == "r") %>% 
+  dplyr::select(effect_size_num, effect_size, n_pt, n_comparison) %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+r_to_d_func <- function(.x) {
+  return(effectsize::r_to_d(.x))
+}
+
+d_values <- map(.x = r_to_d_data$effect_size, .f = r_to_d_func)
+
+d_values <- data.frame(unlist(d_values)) %>% 
+  mutate(d_values = unlist.d_values.) %>% 
+  dplyr::select(-unlist.d_values.)
+
+r_to_d_converted <- cbind(r_to_d_data, d_values) %>% 
+  mutate(d_values_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((d_values^2)/(2*(n_pt+n_comparison))))) %>% 
+  dplyr::select(-n_pt, -n_comparison, - effect_size)
+
+converted_data <- left_join(prelims_data_ftmeanconverted, r_to_d_converted, by = "effect_size_num")
+```
+
+## Convert regression coefficients to d
+
+We need SD of the DV - which most studies did not provide - in order to convert this. We will need to add these studies (k = 21) to our "Contact Authors" sheet if they are not already on there for some reason.
+
+```{r saving data}
+# Saving a clean version of data to be read in different R files
+write.csv(converted_data, "converted_data.csv")
+```
