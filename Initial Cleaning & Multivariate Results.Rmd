@@ -71,6 +71,16 @@ get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv f
   return(I2)
 }
 
+# And getting it cleaned per a list of results
+
+get_I2_overall_clean <- function(x, y){ #x is data that was mapped, y is meta results
+  I2 <- data.frame(map2(x, y, ~get_I2_overall(.x, .y)))
+  I2 %>% 
+    pivot_longer(1:ncol(I2)) %>% 
+    mutate(I2_overall = value) %>% 
+    select(-value, -name)
+}
+
 # total variance attributed to between and within-level clusters separately
 ## From left to right in every model unless specified:
 ## Between sample heterogeneity
@@ -84,6 +94,69 @@ get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.m
   P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
   I2 <- round(100 * (.y$sigma2)/ (sum(.y$sigma2) + (.y$k-.y$p)/sum(diag(P))), digits = 2)
   return(I2)
+}
+
+# Get column for between study hetereogeneity to put in table
+get_btw_study_I2 <- function(x){#x is output from function that gets I2 var levels per study
+  between_study_I2 <- list(length = length(x))
+  
+  for (i in seq_along(x)){
+    between_study_I2[[i]] <- x[[i]][1]
+    }
+  
+  btw_study_I2 <- data.frame(between_study_I2) 
+  btw_study_I2 %>% 
+    pivot_longer(1:ncol(btw_study_I2)) %>% 
+    mutate(I2_btw_study = value) %>% 
+    select(-value, -name)
+}
+
+# Get column for within study heterogeneity
+get_within_study_I2 <- function(x){#ne meta-analyses with three-level nesting structure, this woudl correspond to within-study variance (within-outcome variance)
+  within_study_I2 <- list(length = length(x))
+  
+  for (i in seq_along(x)){
+    within_study_I2[[i]] <- x[[i]][2]
+    }
+  
+  within_I2 <- data.frame(within_study_I2) 
+  within_I2 %>% 
+    pivot_longer(1:ncol(within_I2)) %>% 
+    mutate(I2_within_study = value) %>% 
+    select(-value, -name)
+}
+
+### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
+
+get_crossed_study_I2 <- function(x){#x is output from function that gets I2 var levels per study
+  crossed_study_I2 <- list(length = length(x))
+  
+  for (i in seq_along(x)){
+    crossed_study_I2[[i]] <- x[[i]][3]
+    }
+  
+  crossed_I2 <- data.frame(crossed_study_I2) 
+  crossed_I2 %>% 
+    pivot_longer(1:ncol(crossed_I2)) %>% 
+    mutate(I2_crossed_scale = value) %>% 
+    select(-value, -name)
+}
+
+# Function that subsets data into multiple datasets based on two filters & runs an rma.mv meta-analysis 
+filtered_meta <- function(x, y, z){ #x is the overall dataset, y is the first set of filters, z is the second set of filters
+  df <- list(length = length(y))
+  
+  for (i in seq_along(y)){
+  df[[i]] <- x %>%
+    dplyr::filter(pt_comparison == y[i] & 
+                    outcome_type == z[i])
+  }
+  
+  return(map(df, ~rma.mv(dunb,
+                  var_dunb,
+                  random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                                ~ 1 | outcome_scale_group),
+                  data = .x)))
 }
 
 # Functions to extract values from rma.mv output; needed to help when cleaning my nested output
@@ -107,6 +180,67 @@ get_Q_p_rma <- function(x){
   x$QEp
 }
 
+# Functions to clean values extracted from rma.mv output
+
+get_ests_clean <- function(x){
+  est <- map(x, ~coef(.x)) %>% 
+  as.data.frame()
+  est %>% 
+    pivot_longer(1:ncol(est)) %>% 
+    mutate(estimate = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 3)
+}
+
+get_pval_clean <- function(x){#x is data frame
+  pvals <- map(x, ~get_pval_rma(.x)) %>% 
+  as.data.frame()
+  pvals %>% 
+    pivot_longer(1:ncol(pvals)) %>% 
+    mutate(est_pval = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 3)  
+}
+
+get_ci_upper_clean <- function(x) {
+  uppers <- map(x, ~get_ci_ub_rma(.x)) %>% 
+  as.data.frame()
+  uppers %>% 
+    pivot_longer(1:ncol(uppers)) %>% 
+    mutate(ci_upper = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 3)
+}
+
+get_ci_lower_clean <- function(x) {
+  lower <- map(x, ~get_ci_lb_rma(.x)) %>% 
+  as.data.frame()
+  lower %>% 
+    pivot_longer(1:ncol(lower)) %>% 
+    mutate(ci_upper = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 3)
+}
+
+get_Q_clean <- function(x){
+  Q <- map(x, ~get_Q_rma(.x)) %>% 
+  as.data.frame()
+  Q %>% 
+    pivot_longer(1:ncol(Q)) %>% 
+    mutate(Q = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 3)
+}
+
+get_Q_p_clean <- function(x){
+  Q_ps <- map(x, ~get_Q_p_rma(.x)) %>% 
+  as.data.frame()
+  Q_ps %>% 
+    pivot_longer(1:ncol(Q_ps)) %>% 
+    mutate(Q_pval = value) %>% 
+    dplyr::select(-name, - value) %>% 
+    round(digits = 4)
+}
 ```
 
 # Convert effect sizes
@@ -430,8 +564,8 @@ To get the effect sizes for each PT comparison in each outcome that would corres
 ### Output from individual models to obtain effect sizes per instruction and comparison set:
 
 ```{r meta models per multi subsets with I2}
-# Get subsets of the overall dataset corresponding to each comparison
-## Get labels for the filter in the for loop corresponding to each comparison
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function
 pt_filter1 <- c("pt_v_control", "pt_v_control", "pt_v_control", 
                   "pt_v_objective", "pt_v_objective", "pt_v_objective") 
 
@@ -454,95 +588,29 @@ meta_output <- map(df_4_overall, ~rma.mv(dunb,
                          random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
                                         ~ 1 | outcome_scale_group),
                          data = .x))
-# Mapping over the output of each meta-analysis to get I2 values
-## Overall I2 value for model
-I2_overall_output <- data.frame(map2(df_4_overall, meta_output, ~get_I2_overall(.x, .y))) %>% 
-  pivot_longer(1:6) %>% 
-  mutate(I2_overall = value) %>% 
-  select(-value, -name)
 
-##I2 value per level of nested and crossed variance
+# Overall I2 value for model
+get_I2_overall_clean(df_4_overall, meta_output)
+
+# I2 value per level of nested and crossed variance
 I2_var_levels <-map2(df_4_overall, meta_output, ~get_I2_var_levels(.x, .y))
 
-### Getting values for bewteen study into dataframe column to put in table later
-between_study_I2 <- list(length = length(I2_var_levels))
+### Get column for between study hetereogeneity to put in table
+get_btw_study_I2(I2_var_levels)
 
-for (i in seq_along(I2_var_levels)){
- between_study_I2[[i]] <- I2_var_levels[[i]][1]
-}
+### Getting values for between outcome hetereogeneity (within outcome) for dataframe
+get_within_study_I2(I2_var_levels)
 
-btw_study_I2 <- data.frame(between_study_I2) %>% 
-  pivot_longer(1:6) %>% 
-  mutate(I2_btw_study = value) %>% 
-  select(-value, -name)
+### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
+get_crossed_study_I2(I2_var_levels) 
 
-### Getting values for between outcome into dataframe column to put in table later
-within_study_I2 <- list(length = length(I2_var_levels))
-
-for (i in seq_along(I2_var_levels)){
- within_study_I2[[i]] <- I2_var_levels[[i]][2]
-}
-
-within_I2 <- data.frame(within_study_I2) %>% 
-  pivot_longer(1:6) %>% 
-  mutate(I2_within = value) %>% 
-  select(-value, -name)
-
-### Getting values for crossed scale into dataframe column to put in table later
-
-cross_measure_I2 <- list(length = length(I2_var_levels))
-
-for (i in seq_along(I2_var_levels)){
- cross_measure_I2[[i]] <- I2_var_levels[[i]][2]
-}
-
-cross_I2 <- data.frame(cross_measure_I2) %>% 
-  pivot_longer(1:6) %>% 
-  mutate(I2_crossed = value) %>% 
-  select(-value, -name)
-
-# Mapping over each model to pull out the data so we can put it into one dataframe
-estimates <- map(meta_output, ~coef(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(estimate = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 3)
-
-pval <- map(meta_output, ~get_pval_rma(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(est_pval = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 3)
-
-ci_upper <- map(meta_output, ~get_ci_ub_rma(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(ci_upper = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 3)
-
-ci_lower <- map(meta_output, ~get_ci_lb_rma(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(ci_lower = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 3)
-
-Q_val <- map(meta_output, ~get_Q_rma(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(Q = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 3)
-
-Q_pval <- map(meta_output, ~get_Q_p_rma(.x)) %>% 
-  as.data.frame() %>% 
-  pivot_longer(1:6) %>% 
-  mutate(Q_pval = value) %>% 
-  dplyr::select(-name, - value) %>% 
-  round(digits = 4)
+#Using extraction and cleaning functions I wrote, extract and clean data from model output
+estimates <- get_ests_clean(meta_output)
+pval <- get_pval_clean(meta_output)
+ci_upper <- get_ci_upper_clean(meta_output)
+ci_lower <- get_ci_lower_clean(meta_output)
+Q_val <- get_Q_clean(meta_output)
+Q_pval <- get_Q_p_clean(meta_output)
 
 # Creating the labels for the dataframe
 comparison <- c("Pt vs Control in Stereotyping",
@@ -575,5 +643,34 @@ For the categories other than Interpersonal Feels, only the comparison of pt_v_c
 
 Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
-# Stereotyping Meta-analysis
+```{r}
+pt_filter1_df <- data.frame(pt_comparison = c("pt_v_control", "pt_v_control", "pt_v_control", 
+                  "pt_v_objective", "pt_v_objective", "pt_v_objective")) 
+
+outcome_filter1_df <- data.frame(outcome_type = c("Stereotyping", "Overlap", "Interpersonal Feels",
+                     "Stereotyping", "Overlap", "Interpersonal Feels"))
+
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_overall <- list(length = length(pt_filter1))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(pt_filter1)){
+  df_4_overall[[i]] <- meta_overall1 %>%
+    filter(pt_comparison == pt_filter1[i] & 
+             outcome_type == outcome_filter1[i])
+  }
+
+map(meta_overall1, ~filter(map2(pt_filter1_df, outcome_filter1_df, ~pt_comparison == .x & 
+             outcome_type == .y)),
+             .data = .x)
+
+# Mapping over each subsetted dataset to run the meta-analysis
+meta_output <- map(df_4_overall, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+```
+
+
 

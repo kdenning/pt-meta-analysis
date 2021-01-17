@@ -359,3 +359,23 @@ effect_table <- cbind(label = c("Pt vs Control in Stereotyping",
 
 effect_table
 ```
+
+# Paralell iteration code from before I wrote the function
+```{r}
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_overall <- list(length = length(pt_filter1))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(pt_filter1)){
+  df_4_overall[[i]] <- meta_overall1 %>%
+    filter(pt_comparison == pt_filter1[i] & 
+             outcome_type == outcome_filter1[i])
+  }
+
+# Mapping over each subsetted dataset to run the meta-analysis
+meta_output <- map(df_4_overall, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+```
