@@ -643,34 +643,135 @@ For the categories other than Interpersonal Feels, only the comparison of pt_v_c
 
 Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
-```{r}
-pt_filter1_df <- data.frame(pt_comparison = c("pt_v_control", "pt_v_control", "pt_v_control", 
-                  "pt_v_objective", "pt_v_objective", "pt_v_objective")) 
+# Stereotyping
 
-outcome_filter1_df <- data.frame(outcome_type = c("Stereotyping", "Overlap", "Interpersonal Feels",
-                     "Stereotyping", "Overlap", "Interpersonal Feels"))
+```{r stereo model data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+## creating dataset collapsing across "day in the life" versus "other control"
+meta_stereo1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      self_v_control = c("1", "2"),
+                                      self_v_objective = c("3"),
+                                      other_v_control = c( "5", "6"),
+                                      other_v_objective = c("7"))) %>% 
+  filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
+           pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison))) %>% 
+  mutate(pt_comparison = fct_relevel(pt_comparison, 
+                                     "self_v_objective",
+                                     "self_v_control",
+                                     "other_v_objective",
+                                     "other_v_control"))
+
+
+meta_stereo1 %<>% 
+  filter(outcome_type == "1")
+
+
+## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
+meta_stereo2 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison,
+                                      pt_v_day_control = c("1", "5"),
+                                      pt_v_other_control = c("2", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_day_control" |
+           pt_comparison == "pt_v_other_control" |
+           pt_comparison == "pt_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+meta_stereo2 %<>% 
+  filter(outcome_type == "1")
+```
+
+## Number of unique effect sizes
+
+```{r stereo effect size num}
+meta_stereo1 %>% 
+  count()
+```
+
+## Model comparing imagine-self vs imagine-other instructions with a combined control and objective comparisons
+
+```{r stereo model imagine self vs other}
+contrasts(meta_stereo1$pt_comparison) 
+
+# OVerall model across outcome type
+stereo_meta1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1
+
+get_I2_overall(meta_stereo1, stereo_meta1)
+```
+
+The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
+
+## Estimates for each comparison
+
+```{r meta models for stereo 1 subsets}
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function
+stereo_pt_filter1 <- c("self_v_objective", "self_v_control", 
+                      "other_v_objective", "other_v_control") 
+
 
 ## Get an empty list the length of the number of subsetted datasets we need
-df_4_overall <- list(length = length(pt_filter1))
+df_4_stereo1 <- list(length = length(stereo_pt_filter1))
 
 ## The for loop getting us subsetted datasets
-for (i in seq_along(pt_filter1)){
-  df_4_overall[[i]] <- meta_overall1 %>%
-    filter(pt_comparison == pt_filter1[i] & 
-             outcome_type == outcome_filter1[i])
+for (i in seq_along(stereo_pt_filter1)){ # change () in seq_along to filters
+  df_4_stereo1[[i]] <- meta_stereo1 %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
+    filter(pt_comparison == stereo_pt_filter1[i]) # change () in seq_along to filters
   }
 
-map(meta_overall1, ~filter(map2(pt_filter1_df, outcome_filter1_df, ~pt_comparison == .x & 
-             outcome_type == .y)),
-             .data = .x)
-
 # Mapping over each subsetted dataset to run the meta-analysis
-meta_output <- map(df_4_overall, ~rma.mv(dunb,
+stereosub_output1 <- map(df_4_stereo1, ~rma.mv(dunb,
                          var_dunb,
                          random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
                                         ~ 1 | outcome_scale_group),
                          data = .x))
+
+# Overall I2 value for model
+I2_overall_stereo1 <- get_I2_overall_clean(df_4_stereo1, stereosub_output1)
+
+# I2 value per level of nested and crossed variance
+I2_var_levels_stereo1 <-map2(df_4_stereo1, stereosub_output1, ~get_I2_var_levels(.x, .y))
+
+### Get column for between study hetereogeneity to put in table
+btw_I2_stereo1 <- get_btw_study_I2(I2_var_levels_stereo1)
+
+### Getting values for between outcome hetereogeneity (within outcome) for dataframe
+within_I2_stereo1 <- get_within_study_I2(I2_var_levels_stereo1)
+
+### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
+crossed_I2_stereo1 <- get_crossed_study_I2(I2_var_levels_stereo1) 
+
+#Using extraction and cleaning functions I wrote, extract and clean data from model output
+estimates_stereo1 <- get_ests_clean(stereosub_output1)
+pval_stereo1 <- get_pval_clean(stereosub_output1)
+ci_upper_stereo1 <- get_ci_upper_clean(stereosub_output1)
+ci_lower_stereo1 <- get_ci_lower_clean(stereosub_output1)
+Q_val_stereo1 <- get_Q_clean(stereosub_output1)
+Q_pval_stereo1 <- get_Q_p_clean(stereosub_output1)
+
+# Creating the labels for the dataframe
+comparison_stereo1 <- c("self_v_objective", "self_v_control",
+                "other_v_objective", "other_v_control") 
+
+# Combinind everything into one dataframe
+cbind(comparison_stereo1, 
+      estimates_stereo1,
+      pval_stereo1,
+      ci_upper_stereo1,
+      ci_lower_stereo1,
+      Q_val_stereo1,
+      Q_pval_stereo1,
+      I2_overall_stereo1,
+      btw_I2_stereo1,
+      within_I2_stereo1,
+      crossed_I2_stereo1)
 ```
-
-
 
