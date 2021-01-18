@@ -2,7 +2,11 @@
 title: "Multivariate Results"
 author: "Kathryn Denning"
 date: "1/14/2021"
-output: html_document
+output: 
+  html_document:
+    code_folding: "hide"
+    toc: true
+    toc_float: true
 editor_options: 
   chunk_output_type: console
 ---
@@ -104,35 +108,47 @@ meta_data <- converted_data %>%
          target_information = as.factor(target_information))
 ```
 
-# Descriptive information about the studies that made it into the meta-analysis
+# Descriptive information about included studies
+## Number of papers
 
 ```{r descriptive info before collapsing conditions}
-# Number of papers
 meta_data %>% 
   mutate(authors = as.factor(authors)) %>% 
   dplyr::select(authors) %>% 
   unique() %>% 
   count()
+```
 
-# Number of studies
+## Number of studies per paper
+
+```{r}
 meta_data %>% 
   dplyr::select(study_num_total) %>% 
   unique() %>% 
   count()
+```
 
-# Number of unique samples due to some studies having multiple targets
+## Number of unique samples
+
+```{r}
 meta_data %>% 
   dplyr::select(sample_number_total) %>% 
   unique() %>% 
   count()
+```
 
-# Unique effect sizes total
+## Unique effect sizes total
+
+```{r}
 meta_data %>% 
   dplyr::select(effect_size_num) %>% 
   unique() %>% 
   count()
+```
 
-# Effect sizes per outcome category
+## Effect sizes per outcome category
+
+```{r}
 meta_data %>% 
   dplyr::select(dunb, outcome_type) %>% 
   unique() %>% 
@@ -202,7 +218,7 @@ k_per_comparison %>%
 
 We will have to collapse across across "day in the life" and "other" control conditions. As our "Self PT versus Objective" is only one study under our pre-registered limit - and this is a preliminary analysis for a doctoral requirement - we will include that category for this analysis with the expectation that when we include regression coefficients and data from contacted authors, it will be over our limit (spoiler alert: it will). Therefore, for the analysis specifically examining interpersonal feelings outcomes, we will not collapse across Imagine-self and Imagine-other instruction comparisons. 
 
-# Overall Meta-analysis
+# Overall Multivariate Meta-analysis
 
 ```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
@@ -226,9 +242,6 @@ meta_overall1 <- meta_data %>%
 meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
                                      "pt_v_control"))
 
-# Making sure Interpersonal feels is now the reference level
-levels(meta_overall1$outcome_type)
-
 #for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
 
 # WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
@@ -250,14 +263,15 @@ meta_overall1 %>%
 ```
 
 
-# Overall Meta-analysis
+## Multivariate model results
 
-## Pre-registered multivariate model with perspective taking and outcome type
+**Contrasts:**
+
+```{r multi contrasts}
+contrasts(meta_overall1$outcome_type)
+```
 
 ```{r overall meta interaction mod}
-contrasts(meta_overall1$outcome_type)
-
-# When we include outcome type
 meta_multi2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_type,
@@ -265,7 +279,19 @@ meta_multi2 <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = meta_overall1)
 
 meta_multi2
+```
+
+### I2 overall
+
+```{r overall I2 multi}
 get_I2_overall(meta_overall1, meta_multi2)
+```
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 multi}
 get_I2_var_levels(meta_overall1, meta_multi2)
 ```
 
@@ -289,7 +315,7 @@ The interactions in the multivariate overall model tells us there are statistica
 
 To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis).
 
-### Output from individual models to obtain effect sizes per instruction and comparison set:
+## Output from individual models to obtain estimates per comparison:
 
 ```{r meta models per multi subsets with I2}
 # Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
@@ -350,23 +376,25 @@ comparison <- c("Pt vs Control in Stereotyping",
                 "PT vs Objective in Interpersonal feelings")
 
 # Combinind everything into one dataframe
-cbind(data.frame(comparison), 
-      k,
-      data.frame(estimates),
-      data.frame(pval),
-      data.frame(ci_upper),
-      data.frame(ci_lower),
-      data.frame(Q_val),
-      data.frame(Q_pval),
-      I2_overall_multi,
-      btw_I2_multi,
-      within_I2_multi,
-      crossed_I2_multi)
+multi_combined <- cbind(comparison, 
+                        k,
+                        estimates,
+                        pval,
+                        ci_upper,
+                        ci_lower,
+                        Q_val,
+                        Q_pval,
+                        I2_overall_multi,
+                        btw_I2_multi,
+                        within_I2_multi,
+                        crossed_I2_multi)
+
+knitr::kable(multi_combined)
 ```
 
 The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction. 
 
-*Note for Sara: This change from before for imagine-other vs no-instructions in the interpersonal feels category is due to me adding three effect sizes converted from correlation coefficients that I had previously forgot to convert... I guess they were outliers, since it increased from .16 to .27*
+*Note for Sara H: This change from before for imagine-other vs no-instructions in the interpersonal feels category is due to me adding three effect sizes converted from correlation coefficients that I had previously forgot to convert... I guess they were outliers, since it increased from .16 to .27*
 
 
 For the categories other than Interpersonal Feels, only the comparison of pt_v_control is statistically different from 0 for the Overlap/merging category. This is surprising and opposite of the pattern found in the interpersonal feelings category. The comparison of pt_v_objective is marginal, though the estimate itself is not much smaller. This is the category in which the number of studies included is small, which could be impacting these results. We will have to see if these differ from each other when analyzed in their own model.
@@ -418,11 +446,15 @@ meta_stereo1 %>%
   count()
 ```
 
-## Model comparing imagine-self vs imagine-other instructions with a combined control and objective comparisons
+## Model looking at imagine-self vs imagine-other
+
+**Contrasts:**
+
+```{r stereo1 conrasts}
+contrasts(meta_stereo1$pt_comparison) 
+```
 
 ```{r stereo model imagine self vs other}
-contrasts(meta_stereo1$pt_comparison) 
-
 # OVerall model across outcome type
 stereo_meta1 <- rma.mv(dunb, 
                       var_dunb, 
@@ -431,14 +463,25 @@ stereo_meta1 <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = meta_stereo1)
 
 stereo_meta1
+```
 
+### I2 overall
+
+```{r overall I2 stereo 1}
 get_I2_overall(meta_stereo1, stereo_meta1)
+```
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 stereo 1}
 get_I2_var_levels(meta_stereo1, stereo_meta1)
 ```
 
 The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
 
-### Estimates for each comparison
+### Output from individual models to obtain estimates per comparison:
 
 ```{r meta models for stereo 1 subsets}
 # Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
@@ -492,25 +535,31 @@ comparison_stereo1 <- c("self_v_objective", "self_v_control",
                 "other_v_objective", "other_v_control") 
 
 # Combinind everything into one dataframe
-cbind(comparison_stereo1, 
-      k_stereo1,
-      estimates_stereo1,
-      pval_stereo1,
-      ci_upper_stereo1,
-      ci_lower_stereo1,
-      Q_val_stereo1,
-      Q_pval_stereo1,
-      I2_overall_stereo1,
-      btw_I2_stereo1,
-      within_I2_stereo1,
-      crossed_I2_stereo1)
+stereo1_combined <- cbind(comparison_stereo1,
+                          k_stereo1,
+                          estimates_stereo1,
+                          pval_stereo1,
+                          ci_upper_stereo1,
+                          ci_lower_stereo1,
+                          Q_val_stereo1,
+                          Q_pval_stereo1,
+                          I2_overall_stereo1,
+                          btw_I2_stereo1,
+                          within_I2_stereo1,
+                          crossed_I2_stereo1)
+
+knitr::kable(stereo1_combined)
 ```
 
 ## Model comparing "day in the life," other control, and objective comparisons
 
-```{r stereo model imagine self vs other}
-contrasts(meta_stereo2$pt_comparison) 
+**Contrasts:**
 
+```{r stereo2 contrasts}
+contrasts(meta_stereo2$pt_comparison) 
+```
+
+```{r stereo model day in the life vs other control vs objective}
 # OVerall model across outcome type
 stereo_meta2 <- rma.mv(dunb, 
                       var_dunb, 
@@ -519,7 +568,19 @@ stereo_meta2 <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = meta_stereo2)
 
 stereo_meta2
+```
 
+### Overall I2
+
+```{r overall I2 stereo 2}
+get_I2_overall(meta_stereo2, stereo_meta2)
+```
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 stereo 2}
 get_I2_var_levels(meta_stereo2, stereo_meta2)
 ```
 
@@ -533,7 +594,7 @@ anova(stereo_meta2, btt=2:3)
 
 They do not significantly differ.
 
-### Estimates for each comparison
+### Output from individual models to obtain estimates per comparison:
 
 ```{r meta models for stereo 2 subsets}
 # Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
@@ -586,23 +647,25 @@ comparison_stereo2 <- c("pt_v_day_control", "pt_v_other_control",
                        "pt_v_objective") 
 
 # Combinind everything into one dataframe
-cbind(comparison_stereo2, 
-      k_stereo2,
-      estimates_stereo2,
-      pval_stereo2,
-      ci_upper_stereo2,
-      ci_lower_stereo2,
-      Q_val_stereo2,
-      Q_pval_stereo2,
-      I2_overall_stereo2,
-      btw_I2_stereo2,
-      within_I2_stereo2,
-      crossed_I2_stereo2)
+stereo2_combined <- cbind(comparison_stereo2,
+                         k_stereo2,
+                         estimates_stereo2,
+                         pval_stereo2,
+                         ci_upper_stereo2,
+                         ci_lower_stereo2,
+                         Q_val_stereo2,
+                         Q_pval_stereo2,
+                         I2_overall_stereo2,
+                         btw_I2_stereo2,
+                         within_I2_stereo2,
+                         crossed_I2_stereo2)
+
+knitr::kable(stereo2_combined)
 ```
 
 # Overlap
 
-```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+```{r overlap meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
 overlap_data <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
@@ -620,14 +683,14 @@ overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_object
   filter(outcome_type == "Overlap")
 ```
 
-Number of overall effects:
+## Number of overall effects:
 
 ```{r effects overlap data}
 overlap_data %>% 
   count()
 ```
 
-Effects per comparison group:
+## Effects per comparison group:
 
 ```{r effects pt overlap data}
 overlap_data %>% 
@@ -635,7 +698,13 @@ overlap_data %>%
   count()
 ```
 
-## Comparing PT comparisons in one model without other outcomes
+## Comparing PT comparisons in one model without other outcomes:
+
+**Contrasts:**
+
+```{r overlap contrasts}
+contrasts(overlap_data$pt_comparison)
+```
 
 ```{r overlap model pt}
 overlap_pt <- rma.mv(dunb, 
@@ -645,8 +714,19 @@ overlap_pt <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = overlap_data)
 
 overlap_pt
+```
 
+### I2 overall model
+
+```{r I2 overall overlap}
 get_I2_var_levels(overlap_data, overlap_pt)
+```
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels overlap}
 get_I2_overall(overlap_data, overlap_pt)
 ```
 
@@ -674,14 +754,14 @@ feels %<>%
 
 ```
 
-Number of overall effects:
+## Number of overall effects:
 
 ```{r number of effect sizes feels}
 feels %>% 
   count()
 ```
 
-Effects per comparison group:
+## Effects per comparison group:
 
 ```{r effects pt feels data}
 feels %>% 
@@ -691,11 +771,15 @@ feels %>%
 
 19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims.
 
-## Comparing PT comparisons in one model without other outcomes
+## Model results
 
-```{r overlap model pt}
+**Contrasts:**
+
+```{r feels pt contrasts}
 contrasts(feels$pt_comparison)
+```
 
+```{r r feels model pt}
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
@@ -703,16 +787,25 @@ feels_model <- rma.mv(dunb,
                                     ~ 1 | outcome_scale_group), data = feels)
 
 feels_model
+```
 
+### Overall I2 for model
+
+```{r overall I2 feels}
 get_I2_var_levels(feels, feels_model)
+```
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 feels}
 get_I2_overall(feels, feels_model)
 ```
 
+### Output from individual models to obtain estimates per comparison:
 
-
-### Estimates for each comparison
-
-```{r meta models for stereo 1 subsets}
+```{r meta models for feels subsets}
 # Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
 ## Get labels for the function
 comparisons_feels <- c("self_v_objective", "self_v_control", 
@@ -759,18 +852,19 @@ ci_lower_feels <- get_ci_lower_clean(feels_sub_output)
 Q_val_feels <- get_Q_clean(feels_sub_output)
 Q_pval_feels <- get_Q_p_clean(feels_sub_output)
 
-# Combinind everything into one dataframe
-cbind(comparisons_feels, 
-      k_feels,
-      estimates_stereo1,
-      pval_stereo1,
-      ci_upper_stereo1,
-      ci_lower_stereo1,
-      Q_val_stereo1,
-      Q_pval_stereo1,
-      I2_overall_stereo1,
-      btw_I2_stereo1,
-      within_I2_stereo1,
-      crossed_I2_stereo1)
-```
+# Combining everything into one dataframe
+feels_combined <- cbind(comparisons_feels,
+                        k_feels,
+                        estimates_stereo1,
+                        pval_stereo1,
+                        ci_upper_stereo1,
+                        ci_lower_stereo1,
+                        Q_val_stereo1,
+                        Q_pval_stereo1,
+                        I2_overall_stereo1,
+                        btw_I2_stereo1,
+                        within_I2_stereo1,
+                        crossed_I2_stereo1)
 
+knitr::kable(feels_combined)
+```

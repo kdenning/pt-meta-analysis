@@ -4,6 +4,143 @@ author: "Kathryn Denning"
 date: "1/12/2021"
 output: html_document
 ---
+```{r target outgroup moderator stereo 1, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+### Trying to get a function to work for target moderators
+
+meta_stereo1_mod_wide <- meta_stereo1 %>% 
+  filter(target_ingroup_nonspecific == "1" | target_ingroup_nonspecific == "2") %>% 
+  droplevels(meta_stereo1$target_ingroup_nonspecific) %>% 
+  mutate(target_empathetic_need = as.factor(target_empathetic_need))
+
+df_4_stereo1_mod_wide <- list(length = length(stereo_pt_filter1))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(stereo_pt_filter1)){ # change () in seq_along to filters
+  df_4_stereo1[[i]] <- meta_stereo1_mod_wide %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
+    filter(pt_comparison == stereo_pt_filter1[i] &
+             target_mod == moderator_filter[i]) # change () in seq_along to filters
+  }
+
+contrasts(meta_stereo1$target_out_minor)
+# 1 = out-group or minority group member; 2 = not; I reorganized the levels so that 2 is the reference group
+
+moderator_filter1 <- c("target_adversary", "target_empathetic_need",
+               "target_ingroup_nonspecific","target_out_minor")
+
+
+df_4_stereo1_mod_wide <- list(length = length(4))
+
+ #x is the list of moderator variables
+for (i in seq_along(meta_stereo1_mod)){ #x is the dataset for the meta-analysis, y is the moderators you want to cycle through as a long format variable
+  stereo_meta1_targinfo <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ ,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_mod_wide)
+  df_4_stereo1_mod_wide[[i]] <- stereo_meta1_targinfo
+}
+
+
+
+my_lms <- lapply(1:n, function(x) lm(Lung[,x] ~ Blood[,x] + Age + Gender))
+
+
+for (x in moderator_filter1) {
+  stereo_meta1_targinfo <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ x,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_mod_wide)
+  print(stereo_meta1_targinfo)
+}
+
+
+
+
+prac <- for (y in seq_along(meta_stereo1_mod$target_mod)){
+                        return(meta_stereo1_mod$target_mod[y])
+                        }
+
+stereo_meta1_targinfo <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ ,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_mod)
+
+stereo_meta1_targinfo <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ ,
+                      random = list(~ 1 | sample_number_total/conditions_within_sample_var/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1_mod)
+stereo_meta1_targinfo
+
+get_I2(meta_stereo1, stereo_meta1_targinfo)
+
+levels(meta_stereo1_mod$target_mod)
+```
+
+```{r stereo 1 target mods, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+meta_stereo1_mod <- meta_stereo1 %>% 
+  filter(target_ingroup_nonspecific == "1" | target_ingroup_nonspecific == "2") %>% 
+  droplevels(meta_stereo1$target_ingroup_nonspecific) %>% 
+  mutate(target_empathetic_need = as.factor(target_empathetic_need)) %>% 
+  pivot_longer(target_ingroup_nonspecific:target_empathetic_need) %>% 
+  mutate(target_mod = as.factor(name),
+         target_mod_level = value) %>% 
+  dplyr::select(-value, - name)
+
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function- using the same pt comparisons as before
+
+moderator_filter[i] <- c("target_adversary", "target_empathetic_need",
+               "target_ingroup_nonspecific","target_out_minor")
+
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_stereo1_mod <- list(length = length(stereo_pt_filter1))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(stereo_pt_filter1)){ # change () in seq_along to filters
+  df_4_stereo1[[i]] <- meta_stereo1 %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
+    filter(pt_comparison == stereo_pt_filter1[i] &
+             target_mod == moderator_filter[i]) # change () in seq_along to filters
+  }
+
+# Mapping over each subsetted dataset to run the meta-analysis
+stereosub_output1 <- map(df_4_stereo1, ~rma.mv(dunb,
+                         var_dunb,
+                         
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+
+
+# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
+## Get labels for the function
+pt_filter1 <- c("pt_v_control", "pt_v_control", "pt_v_control", 
+                  "pt_v_objective", "pt_v_objective", "pt_v_objective") 
+
+outcome_filter1 <- c("Stereotyping", "Overlap", "Interpersonal Feels",
+                     "Stereotyping", "Overlap", "Interpersonal Feels")
+
+## Get an empty list the length of the number of subsetted datasets we need
+df_4_overall <- list(length = length(pt_filter1))
+
+## The for loop getting us subsetted datasets
+for (i in seq_along(pt_filter1)){
+  df_4_overall[[i]] <- meta_overall1 %>%
+    filter(pt_comparison == pt_filter1[i] & 
+             outcome_type == outcome_filter1[i])
+  }
+
+# Mapping over each subsetted dataset to run the meta-analysis
+meta_output <- map(df_4_overall, ~rma.mv(dunb,
+                         var_dunb,
+                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
+                                        ~ 1 | outcome_scale_group),
+                         data = .x))
+
+```
+
 
 ## Adding in PT unspecified
 
