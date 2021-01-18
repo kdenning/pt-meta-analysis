@@ -855,16 +855,16 @@ Q_pval_feels <- get_Q_p_clean(feels_sub_output)
 # Combining everything into one dataframe
 feels_combined <- cbind(comparisons_feels,
                         k_feels,
-                        estimates_stereo1,
-                        pval_stereo1,
-                        ci_upper_stereo1,
-                        ci_lower_stereo1,
-                        Q_val_stereo1,
-                        Q_pval_stereo1,
-                        I2_overall_stereo1,
-                        btw_I2_stereo1,
-                        within_I2_stereo1,
-                        crossed_I2_stereo1)
+                        estimates_feels,
+                        pval_feels,
+                        ci_upper_feels,
+                        ci_lower_feels,
+                        Q_val_feels,
+                        Q_pval_feels,
+                        I2_overall_feels,
+                        btw_I2_feels,
+                        within_I2_feels,
+                        crossed_I2_feels)
 
 knitr::kable(feels_combined)
 ```
