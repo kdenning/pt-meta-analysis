@@ -292,7 +292,7 @@ The two contrasts are significantly different.
 
 The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition) and if they differ from 0. These were obtained using emmeans.
 
-## Marginal means
+## Marginal main effects
 
 ```{r emmeans multi}
 qdrq1 <- qdrg(object = meta_multi2, data = meta_overall1)
@@ -401,7 +401,7 @@ stereo_meta1
 
 The intercept is not significantly different from zero, nor do any effects differ from it.
 
-### Marginal means
+### Marginal main effects
 
 ```{r emmeans stereo1}
 qdrq_stereo1 <- qdrg(object = stereo_meta1, data = meta_stereo1)
@@ -420,7 +420,7 @@ emmeans_stereo1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
                               'Other vs Objective', 'Other vs Control'))
 ```
 
-None of the marginal means differ from zero. There is an interesting pattern in that self or other vs objective lead to higher effect sizes (less stereotype prejudice reduction). However, with nothing differing from zero, this does not mean anything statistically.
+None of the marginal main effects differ from zero. There is an interesting pattern in that self or other vs objective lead to higher effect sizes (less stereotype prejudice reduction). However, with nothing differing from zero, this does not mean anything statistically.
 
 ### I2 overall
 
@@ -505,7 +505,7 @@ emmeans_stereo1_mod2 <- summary(emmeans(qdrq_stereo1_mod2, "pt_comparison", "tar
 emmeans_stereo1_mod2
 ```
 
-None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by target information.
+None of the effect sizes significantly differ from 0 when looking at the marginal main effects when broken down by target information.
 
 #### I2 overall
 
@@ -551,7 +551,7 @@ emmeans_stereo1_mod3 <- summary(emmeans(qdrq_stereo1_mod3, "pt_comparison", "tar
 emmeans_stereo1_mod3
 ```
 
-None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by by target group.
+None of the effect sizes significantly differ from 0 when looking at the marginal main effects when broken down by by target group.
 
 #### I2 overall
 
@@ -632,7 +632,7 @@ anova(stereo_meta2, btt=2:3)
 
 They do not significantly differ.
 
-### Marginal means
+### Marginal main effects
 
 ```{r emmeans stereo2}
 qdrq_stereo2 <- qdrg(object = stereo_meta2, data = meta_stereo2)
@@ -651,7 +651,7 @@ emmeans_stereo2 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
                               'Vs objective'))
 ```
 
-The marginal means do not differ from 0.
+The marginal main effects do not differ from 0.
 
 ### Overall I2
 
@@ -688,7 +688,7 @@ Nothing is significant from one another, and the intercept is not significantly 
 
 #### I2 overall
 
-```{r I2 overall stereo1 mod scales}
+```{r I2 overall stereo2 mod scales}
 get_I2_overall(meta_stereo2, stereo_meta2_mod1)
 ```
 
@@ -698,7 +698,7 @@ About the same as the model without moderators.
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r I2 var levels stere1 mod scales}
+```{r I2 var levels stereo2 mod scales}
 get_I2_var_levels(meta_stereo2, stereo_meta2_mod1)
 ```
 
@@ -718,9 +718,9 @@ stereo_meta2_mod2
 
 Pt v other control with medium target information is marginally different from the intercept (p vs "day  in the life" control with impoverished information). Nothing else is significant from the intercept, nor is the intercept significant.
 
-#### Marginal means
+#### Marginal main effect
 
-```{r emmeans stereo1 mod2 }
+```{r emmeans stereo2 mod2 }
 qdrq_stereo2_mod2 <- qdrg(object = stereo_meta2_mod2, data = meta_stereo2)
 
 emmeans_stereo2_mod2 <- summary(emmeans(qdrq_stereo2_mod2, "pt_comparison", "target_information"))
@@ -731,7 +731,7 @@ None of the effect sizes significantly differ from 0 when looking at the margina
 
 #### I2 overall
 
-```{r I2 overall stereo1 mod2}
+```{r I2 overall stereo2 mod2}
 get_I2_overall(meta_stereo2, stereo_meta2_mod2)
 ```
 
@@ -741,7 +741,7 @@ Slightly higher than the original model without moderators.
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r I2 var levels stere1 mod2}
+```{r I2 var levels stereo2 mod2}
 get_I2_var_levels(meta_stereo2, stereo_meta2_mod2)
 ```
 
@@ -749,8 +749,8 @@ Most hetereogeneity is explained by between-studies variance, followed by betwee
 
 ### Target moderator - target out-group
 
-```{r stereo 1 mod3}
-stereo2_group_data <- meta_stereo1 %>% 
+```{r stereo 2 mod3}
+stereo2_group_data <- meta_stereo2 %>% 
   select(dunb, var_dunb, pt_comparison, target_out_minor, sample_number_total,
          outcomes_within_sample_var, conditions_within_sample_var, outcome_scale_group) %>% 
   na.omit()
@@ -764,22 +764,34 @@ stereo_meta2_mod3 <- rma.mv(dunb,
 stereo_meta2_mod3
 ```
 
-Nothing is significant.
+The intercept (pt v day in the life control with out-group target) is significantly different from 0. Pt v control is marginally different from the intercept, and pt v objective is significantly different from the intercept. The simple main effect of target out-group group is significant: in the "day in the life" control, there are higher positive effect sizes (less prejudice reduction) for non-out-group/minority targets than out-group/minority targets. The interactions are also significant, indicating there are differences between the differences for both pt_v_control with a non-out-group minority target and p_v_objective with a non-out-group/minority target in comparison to the intercept. The marginal main effects will show the estimates of each of these comparisons better, as well as if they differ from 0.
 
-#### Marginal means
+#### Marginal main effects
 
-```{r emmeans stereo1 mod3}
+```{r emmeans stereo2 mod3}
 qdrq_stereo2_mod3 <- qdrg(object = stereo_meta2_mod3, data = stereo2_group_data)
 
 emmeans_stereo2_mod3 <- summary(emmeans(qdrq_stereo2_mod3, "pt_comparison", "target_out_minor"))
 emmeans_stereo2_mod3
-```
 
-None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by by target group.
+outgroup_label <- c("1" = "Outgroup/Minority", "2" = "Non-Outgroup/Minority")
+
+emmeans_stereo2_mod3 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  facet_grid(cols = vars(target_out_minor),
+             labeller = labeller(target_out_minor = outgroup_label)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "'Day in the life' control vs other comparison conditions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Vs `Day in the life`','Vs other control',
+                              'Vs objective'))
+```
 
 #### I2 overall
 
-```{r I2 overall stereo1 mod3}
+```{r I2 overall stereo2 mod3}
 get_I2_overall(stereo2_group_data, stereo_meta2_mod3)
 ```
 
@@ -789,7 +801,7 @@ About the same as the model without moderaters.
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r I2 var levels stere1 mod3}
+```{r I2 var levels stere2 mod3}
 get_I2_var_levels(stereo2_group_data, stereo_meta2_mod3)
 ```
 
@@ -797,7 +809,7 @@ Most heterogeneity explained by between-studies variance, or between-conditions 
 
 ### Sample size
 
-```{r stereo 1 mod4}
+```{r stereo 2 mod4}
 stereo_meta2_mod4 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*n_overall,
@@ -811,7 +823,7 @@ Sample size does not interact with pt comparison. None of the effects are signif
 
 #### I2 overall
 
-```{r I2 overall stereo1 mod4}
+```{r I2 overall stereo2 mod4}
 get_I2_overall(meta_stereo2, stereo_meta2_mod4)
 ```
 
@@ -821,11 +833,11 @@ Heterogeneity is the same as in the model without moderators.
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r I2 var levels stere1 mod4}
+```{r I2 var levels stere2 mod4}
 get_I2_var_levels(meta_stereo2, stereo_meta2_mod4)
 ```
 
-Hetereogeneity is explained by between-studies variance the most, followed almost equally by between-conditions and between-outcomes variance.
+Heterogeneity is explained by between-studies variance the most, followed almost equally by between-conditions and between-outcomes variance.
 
 # Overlap
 
@@ -862,7 +874,9 @@ overlap_data %>%
   count()
 ```
 
-## Comparing PT comparisons in one model without other outcomes:
+## Results
+
+*Note: this comparison is the same as in the overall model interacting with outcome types, as the small k per cell in the overlap/merging category was the reason we had to collapse cross other perspective taking comparisons in that overall model.*
 
 **Contrasts:**
 
@@ -883,19 +897,9 @@ overlap_pt <- rma.mv(dunb,
 overlap_pt
 ```
 
-### I2 overall model
+The intercept is marginally different from zero. The pt v control condition does not differ significantly from the intercept.
 
-```{r I2 overall overlap}
-get_I2_var_levels(overlap_data, overlap_pt)
-```
-
-### I2 for levels of variance
-
-*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
-
-```{r I2 levels overlap}
-get_I2_overall(overlap_data, overlap_pt)
-```
+### Marginal main effect
 
 ```{r emmeans overlap}
 qdrq_overlap <- qdrg(object = overlap_pt, data = overlap_data)
@@ -906,11 +910,29 @@ emmeans_overlap
 
 This comparison is the same as the overall model. Without the interaction, the values change slightly, but the pattern and significance do not.
 
+### I2 overall model
+
+```{r I2 overall overlap}
+get_I2_overall(overlap_data, overlap_pt)
+```
+
+This heterogeneity is still high, but lower than with the stereotyping outcome or the overall model with perspective taking interacting with outcome type.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels overlap}
+get_I2_var_levels(overlap_data, overlap_pt)
+```
+
+Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed struture.
+
 ## Moderators
 
 ### Scale of measurement
 
-```{r r feels model pt}
+```{r overlap model scales mod}
 overlap_data %>% 
   group_by(outcome_scale_group) %>% 
   count()
@@ -922,20 +944,38 @@ overlap_model_mod1 <- rma.mv(dunb,
                       data = overlap_data)
 
 overlap_model_mod1
-
-get_I2_overall(overlap_data, overlap_model_mod1)
 ```
 
-Scale 7 (Self-report IOS merging/scales) while in the pt vs objective comparison is the reference group. There are simple effects in which the effect sizes become significantly lower for the pt vs objective comparison when merging is measured from overlap of traits/attributes or measures of social distancing. There are no interactions. 
+Scale 7 (Self-report IOS merging/scales) while in the pt vs objective comparison is the reference group. These are simple effects in which the effect sizes become significantly lower for the pt vs objective comparison when merging is measured from overlap of traits/attributes or measures of social distancing. There are no interactions. 
 
-The marginal main effects are reported below. When using a self-reported merging scale both pt vs objective and control lead to medium to large effect sizes that differed from 0. When using both the attribution and social distance scales, neither comparison significantly differed from 0.
+#### Marginal main effects
 
-```{r emmeans feels scale}
+```{r emmeans overlap scale}
 qdrq_overlap2 <- qdrg(object = overlap_model_mod1, data = overlap_data)
 
 emmeans_overlap2 <- summary(emmeans(qdrq_overlap2, "pt_comparison", "outcome_scale_group"))
 emmeans_overlap2
 ```
+
+When using a self-reported merging scale both pt vs objective and control lead to medium to large effect sizes that differed from 0. When using both the attribution and social distance scales, neither comparison significantly differed from 0.
+
+#### I2 overall
+
+```{r I2 overall overlap scale}
+get_I2_overall(overlap_data, overlap_model_mod1)
+```
+
+With this moderator, the heterogeneity lessens a bit.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels overlap scale}
+get_I2_var_levels(overlap_data, overlap_model_mod1)
+```
+
+Almost all of the heterogeneity can be explained by between-studies variance.
 
 ### Target - amount of information
 
@@ -943,24 +983,47 @@ emmeans_overlap2
 overlap_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
 overlap_model_mod2
-
-get_I2_overall(overlap_data, overlap_model_mod2)
 ```
 
-None are significant. I2 lowered. With there being no redundcies in the model, I wonder if we can model an interaction with scale?
+None are significant. I2 lowered.
 
-```{r emmeans overlap in-group targ mod}
+#### Marginal main effects
+
+```{r emmeans overlap targ info mod}
 qdrq_overlap3 <- qdrg(object = overlap_model_mod2, data = overlap_data)
 
-emmeans_overlap3 <- summary(emmeans(qdrq_overlap2, "pt_comparison", "target_information"))
+emmeans_overlap3 <- summary(emmeans(qdrq_overlap3, "pt_comparison", "target_information"))
 emmeans_overlap3
 ```
 
-When target information is impoverished and pt is compared to the control, the effect significantly differs from 0 and is medium-sized. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a large effect size. 
+When target information is impoverished, tneither comparison significantly differs from 0. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a medium to large effect size. 
+
+#### Overall I2
+
+```{r overall I2 overlap targ info}
+get_I2_overall(overlap_data, overlap_model_mod2)
+```
+
+Heterogeneity is even lower when including target information in the model.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 overlap targ info}
+get_I2_var_levels(overlap_data, overlap_model_mod2)
+```
+
+Most of this heterogeneity is attributed to between-studies variance, with variance due to scales of measurement (17%) and then between-outcomes attributing to similar amounts (13%).
+
+With there being no redundancies in the model and lower I2, I wonder if we can model an interaction with scale?
+
+### Both scale & target info
 
 ```{r}
 #Modeled target information as a main effect since it had no interactions and, because, when I tried to model it with interactions it led to redundancies
@@ -980,11 +1043,25 @@ overlap_model_mod3 <- rma.mv(dunb,
                       data = overlap_data)
 
 overlap_model_mod3
+```
 
+The I2 decreases having all three predictors in the model, though it is concerning that some cells are 0 and that was causing redundancies. Cannot model with emmeans because of redundancies.
+
+#### I2 overall
+
+```{r I2 overall scale and targ mod}
 get_I2_overall(overlap_data, overlap_model_mod3)
 ```
 
-The I2 decreases having all three predictors in the model, though it is concerning that some cells are 0 and that was causing redundcies. 
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels scale and targ mod}
+get_I2_var_levels(overlap_data, overlap_model_mod3)
+```
+
+All variance is explained by between-studies variance. This is probably due to k being too small per cell.
 
 ### Target - In-group target grouping (relevant to outcome category)
 
@@ -1002,23 +1079,37 @@ overlap_model_mod4 <- rma.mv(dunb,
                       data = overlap_data)
 
 overlap_model_mod4
-
-get_I2_overall(overlap_data, overlap_model_mod4)
 ```
 
-Tried running an out-group moderator model as well, but it had a convergence issue.
-
-The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept.
+The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept. Tried running an out-group moderator model as well, but it had a convergence issue.
 
 
 ```{r emmeans overlap in-group targ mod}
 qdrq_overlap4 <- qdrg(object = overlap_model_mod4, data = overlap_data)
 
-emmeans_overlap4 <- summary(emmeans(qdrq_overlap3, "pt_comparison", "target_ingroup_nonspecific"))
+emmeans_overlap4 <- summary(emmeans(qdrq_overlap4, "pt_comparison", "target_ingroup_nonspecific"))
 emmeans_overlap4
 ```
 
-The marginal means indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-signfiant and are about the same regardless of if pt is being compared to the objective or control condition. Both are lower than the in-group effect sizes.
+The marginal main effects indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-significant and are about the same regardless of if pt is being compared to the objective (.31) or control condition (.34). Both are lower than the in-group effect sizes.
+
+#### I2 overall
+
+```{r overlap targ group mod I2 overall}
+get_I2_overall(overlap_data, overlap_model_mod4)
+```
+
+Heterogeneity is not as low as other moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r overlap targ group mod I2 var levels}
+get_I2_var_levels(overlap_data, overlap_model_mod4)
+```
+
+Most heterogeneity is explained by between-studies variance, followed by between-outcomes variance.
 
 ### Sample size
 
@@ -1031,15 +1122,31 @@ overlap_model_mod5 <- rma.mv(dunb,
                       data = overlap_data)
 
 overlap_model_mod5
-
-get_I2_overall(overlap_data, overlap_model_mod5)
 ```
 
 Intercept different from 0. No interaction with sample size.
 
+#### I2 overall
+
+```{r overlap n mod I2 overall}
+get_I2_overall(overlap_data, overlap_model_mod5)
+```
+
+Overall I2 is higher with this moderator.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r overlap n mod I2 var level}
+get_I2_var_levels(overlap_data, overlap_model_mod5)
+```
+
+Most heterogeneity is explained by between-studies variance. 
+
 # Interpersonal Feelings
 
-```{r}
+```{r feels data prep}
 feels <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       self_v_control = c("1", "2"),
@@ -1096,19 +1203,9 @@ feels_model <- rma.mv(dunb,
 feels_model
 ```
 
-### Overall I2 for model
+The intercept (self vs objective) is significantly different from 0. The simple effects indicate that self v control and other v control lead to significantly lower effect sizes than self v objective. Other v objective did not differ from the intercept.
 
-```{r overall I2 feels}
-get_I2_overall(feels, feels_model)
-```
-
-### I2 for levels of variance
-
-*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
-
-```{r levels I2 feels}
-get_I2_var_levels(feels, feels_model)
-```
+### Marginal main effects
 
 ```{r emmeans feels breakdown}
 qdrq_feels1 <- qdrg(object = feels_model, data = feels)
@@ -1127,20 +1224,38 @@ emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
                               'Other vs Objective', 'Other vs Control'))
 ```
 
+The marginal main effects indicate that all effect sizes except self v control significantly differ from 0. However, both self and other vs objective have medium to large effect sizes, and other v control has a small effect size.
+
+### Overall I2 for model
+
+```{r overall I2 feels}
+get_I2_overall(feels, feels_model)
+```
+
+High heterogeneity.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 feels}
+get_I2_var_levels(feels, feels_model)
+```
+
+Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
+
 ## Moderators
 
-### Scale of measurement
+### Scales of measurement
 
-```{r r feels model pt}
-levels(feels$outcome_scale_group)
-
+```{r feels model scales mod}
 feels %>% 
   group_by(outcome_scale_group) %>% 
   count()
 
 feels_mod <- feels %>% 
   filter(outcome_scale_group != 16) %>% 
-  unique()
+  unique() #removing this level since there is only one study in it
 
 feels_mod$outcome_scale_group <- droplevels(feels_mod$outcome_scale_group)
 
@@ -1152,32 +1267,31 @@ feels_model_mod1 <- rma.mv(dunb,
                       data = feels_mod)
 
 feels_model_mod1
+```
 
+Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons that have 0 studies per cell. There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). 
+
+#### I2 overall
+
+```{r I2 overall scales}
 get_I2_overall(feels_mod, feels_model_mod1)
-
-#model with no interaction for emmeans object
-feels_model_mod1_noint <- rma.mv(dunb, 
-                      var_dunb,
-                      mods = ~ pt_comparison + outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
-                      data = feels_mod)
-
-feels_model_mod1_noint 
 ```
 
-Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons in the interaction contrasts (only ran one interaction estimate for scale group 13 and 15). There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). Scale of measurement only lowered the I2 by 2%. 
+Scale of measurement only lowered the I2 by 2%. 
 
-```{r emmeans feels scale}
-#Emmeans could not run on the interaction model because of the redundancies that were dropped, so re-ran the model without the interactions since none were significant
-qdrq_feels2 <- qdrg(object = feels_model_mod1_noint, data = feels_mod)
+#### I2 for levels of variance
 
-emmeans_feels2 <- summary(emmeans(qdrq_feels2, "pt_comparison", "outcome_scale_group"))
-emmeans_feels2
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels scale mods}
+get_I2_var_levels(feels_mod, feels_model_mod1)
 ```
+
+Most heterogeneity is explained by between-study variance, followed by between-outcomes variance.
 
 ### Target - amount of information
 
-```{r}
+```{r feels targ info mod}
 feels_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
@@ -1186,15 +1300,31 @@ feels_model_mod2 <- rma.mv(dunb,
                       data = feels_mod)
 
 feels_model_mod2
-
-get_I2_overall(feels_mod, feels_model_mod2)
 ```
 
 None are significant. Emmeans won't work because redundant predictors were dropped from ram.mv model.
 
+#### I2 overall
+
+```{r I2 overall feels targ info}
+get_I2_overall(feels_mod, feels_model_mod2)
+```
+
+High heterogeneity - moderator did not help.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels feels targ info}
+get_I2_var_levels(feels_mod, feels_model_mod2)
+```
+
+Most variance explained by between-study variance, with almost 12% explained by scales of measurement.
+
 ### Target - In need/In distress target grouping (relevant to outcome category)
 
-```{r}
+```{r feels targ need mod}
 feels_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_emapthetic_need,
@@ -1203,21 +1333,42 @@ feels_model_mod3 <- rma.mv(dunb,
                       data = feels_mod)
 
 feels_model_mod3
-
-get_I2_overall(feels_mod, feels_model_mod3)
 ```
 
+The intercept is significantly different from 0. The difference between other v control and intercept is marginal. There are no interactions.
+
+#### Marginal main effects
+
 ```{r emmeans feels empathetic need targ mod}
-#Emmeans could not run on the interaction model because of the redundancies that were dropped, so re-ran the model without the interactions since none were significant
 qdrq_feels3 <- qdrg(object = feels_model_mod3, data = feels_mod)
 
 emmeans_feels3 <- summary(emmeans(qdrq_feels3, "pt_comparison", "target_emapthetic_need"))
 emmeans_feels3
 ```
 
+Self and other vs objective still are different from 0 when the target is empathetic. Self and other vs control are not different from 0 when the target is empathetic. When the target is not empathetic, the only condition that does not differ from 0 is self vs control.
+
+#### I2 overall
+
+```{r feels need targ I2 overall}
+get_I2_overall(feels_mod, feels_model_mod3)
+```
+
+High heterogeneity
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r feels need targ I2 levels}
+get_I2_var_levels(feels_mod, feels_model_mod3)
+```
+
+Most heterogeneity explained by between-studies variance, with over 13% by scales of measurement.
+
 ### Sample size
 
-```{r sample size mod overlap}
+```{r sample size mod feels}
 feels_model_mod4 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
@@ -1226,9 +1377,20 @@ feels_model_mod4 <- rma.mv(dunb,
                       data = feels_mod)
 
 feels_model_mod4
-
-get_I2_overall(feels_mod, feels_model_mod4)
-get_I2_var_levels(feels_mod, feels_model_mod4)
-```
+````
 
 Intercept different from 0. No interaction with sample size.
+
+#### I2 overall
+
+```{r n feels I2 overall}
+get_I2_overall(feels_mod, feels_model_mod4)
+```
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r n feels I2 var levels}
+get_I2_var_levels(feels_mod, feels_model_mod4)
+```
