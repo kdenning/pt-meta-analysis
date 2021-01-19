@@ -28,6 +28,7 @@ editor_options:
 #install.packages("compute.es")
 #install.packages("multcomp")
 #install.packages("car")
+#install.packages("emmeans")
 library(rio)
 library(here)
 library(magrittr)
@@ -41,7 +42,7 @@ library(compute.es)
 library(multcomp)
 library(car)
 library(tidyverse)
-library(dmetar)
+library(emmeans)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -68,7 +69,7 @@ source("meta_functions.R")
 ```
 
 ```{r data cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
-# Other data prep
+# data prep
 meta_data <- converted_data %>%  
   mutate(cohens_d = as.numeric(cohens_d),
          reverse = as.factor(reverse)) %>% 
@@ -108,61 +109,9 @@ meta_data <- converted_data %>%
          target_information = as.factor(target_information))
 ```
 
-# Descriptive information about included studies
-## Number of papers
+# Checking if conditions need collapsed
 
-```{r descriptive info before collapsing conditions}
-meta_data %>% 
-  mutate(authors = as.factor(authors)) %>% 
-  dplyr::select(authors) %>% 
-  unique() %>% 
-  count()
-```
-
-## Number of studies per paper
-
-```{r}
-meta_data %>% 
-  dplyr::select(study_num_total) %>% 
-  unique() %>% 
-  count()
-```
-
-## Number of unique samples
-
-```{r}
-meta_data %>% 
-  dplyr::select(sample_number_total) %>% 
-  unique() %>% 
-  count()
-```
-
-## Unique effect sizes total
-
-```{r}
-meta_data %>% 
-  dplyr::select(effect_size_num) %>% 
-  unique() %>% 
-  count()
-```
-
-## Effect sizes per outcome category
-
-```{r}
-meta_data %>% 
-  dplyr::select(dunb, outcome_type) %>% 
-  unique() %>% 
-  group_by(outcome_type) %>% 
-  count() %>% 
-  mutate(outcome_type = dplyr::recode(outcome_type,
-                               `1` = "Stereotyping/Bias",
-                               `2` = "Overlap/Merging",
-                               `3` = "Interpersonal Feelings"))
-```
-
-## Checking if we need to collapse perspective taking conditions
-
-### Stereotyping outcome
+## Stereotyping outcome
 
 ```{r k per condition stereotyping}
 # Number of effect sizes per comparison we coded 
@@ -198,7 +147,7 @@ For stereotyping, we will do the following:
     + We will collapse across the "Day in the life" and "Other" control conditions. This will allow us to analyze Imagine-self versus Imagine-other perspective taking in comparison to a broad control and the objective comparison condition. 
     + We will then collapse across Imagine-self and Imagine-other to examine the if there is difference between the effect of perspective taking instructions when the comparison is the "Day in the life control" versus "Other control" or objective comparison.
 
-### Merging/Overlap outcome
+## Merging/Overlap outcome
 
 ```{r k per condition overlap}
 # For overlap/merging outcome
@@ -208,7 +157,7 @@ k_per_comparison %>%
 
 Due to the lower number of studies in this outcome category, we will have to collapse across both Imagine-self and Imagine-other perspective taking instructions as well as "Day in the life" and "Other control" comparisons. As this is the most limiting of the outcomes, we will have to collapse this same way in all outcome categories for the overall meta-analysis when we will include outcome as a predictor.
 
-### Interpersonal feelings outcome
+## Interpersonal feelings outcome
 
 ```{r k per condition interpersonal feels}
 # For interpersonal feelings
@@ -247,14 +196,63 @@ meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objec
 # WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
 ```
 
+## Descriptive info
+
+### Number of papers
+
+```{r descriptive info before collapsing conditions}
+meta_overall1 %>% 
+  mutate(authors = as.factor(authors)) %>% 
+  dplyr::select(authors) %>% 
+  unique() %>% 
+  count()
+```
+
+### Number of studies per paper
+
+```{r}
+meta_overall1 %>% 
+  dplyr::select(study_num_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Number of unique samples
+
+```{r}
+meta_overall1 %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+
+### Unique effect sizes
+
 ```{r effect size overall mod}
-# Effect sizes in overall model
 meta_overall1 %>% 
   dplyr::select(effect_size_num) %>% 
   unique() %>% 
   count()
+```
 
-# Effect sizes per comparison and stereotyping category
+### Effect sizes per outcome category
+
+```{r}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type) %>% 
+  unique() %>% 
+  group_by(outcome_type) %>% 
+  count() %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `1` = "Stereotyping/Bias",
+                               `2` = "Overlap/Merging",
+                               `3` = "Interpersonal Feelings"))
+```
+
+### Effect sizes per comparison and outcome category
+
+```{r effect sizes overall model per outcome}
 meta_overall1 %>% 
   dplyr::select(dunb, pt_comparison, outcome_type) %>% 
   unique() %>% 
@@ -262,8 +260,7 @@ meta_overall1 %>%
   count() 
 ```
 
-
-## Multivariate model results
+## Model results
 
 **Contrasts:**
 
@@ -281,25 +278,7 @@ meta_multi2 <- rma.mv(dunb,
 meta_multi2
 ```
 
-### I2 overall
-
-```{r overall I2 multi}
-get_I2_overall(meta_overall1, meta_multi2)
-```
-
-### I2 for levels of variance
-
-*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
-
-```{r levels I2 multi}
-get_I2_var_levels(meta_overall1, meta_multi2)
-```
-
-The intercept is when both moderators = 0 (When the pt is compared to the objective condition and interpersonal feels is the reference). We are particularly interested in the interaction and estimates. We used interpersonal feels as the reference because it is the the most studied PT sub-field - and the one in which a different meta-analysis already exists - and we are curious if the effect of perspective taking is the same across outcome types or differs. We used pt vs objective because, when combined with interpersonal feels, we would expect the largest effect in that cell. Therefore, we are interested if perspective taking in other outcome types follows this same pattern or differs.
-
-The "pt_comparisonpt_v_control" contrast supports the theory that I just described. In comparison to the intercept - which represents the effect of pt vs objective in the interpersonal context - the objective control condition shows a decrease of effect size (this is with interpersonal feels context held constant). With pt v objective held constant and just changing outcome, the overlap outcome did not differ significantly from interpersonal feels, however, the stereotyping outcome was significantly lower. 
-
-When we look at the interaction we see there is only one significant effect for the contrast. This is not as intuitively interpretable as the main effects. When we vary up both perspective taking and outcome in the fifth estimate (estimate "pt_comparisonpt_v_control:outcome_typeOverlap") looking at pt_v_objective in the overlap condition versus pt_v_control in interpersonal feels condition, we see there there is not a significant difference from the intercept. We do see a significant change in which the slope of the contrast demonstrates a positive increase between the pt_v_control and stereotyping condition versus the intercept.
+The intercept is when When pt is compared to the objective condition and interpersonal feels is the outcome. When looking at the main effect, this indicates that - in the interpersonal feeling category - the pt v control condition leads to significantly lower effect sizes the pt vs objective. When comparing pt v objective, there is no difference between the interpersonal feels and overlap conditions, but the stereotyping condition is significantly less than the interpersonal feels condition. The estimates representing the contrasts signify the "difference between the differences" (e.g., how large is the difference between the difference between pt comparison levels and outcome levels being compared in this contrast?). This model demonstrates this difference of differences is significant when comparing the stereotyping outcome and pt v control to the interpersonal feels outcome when pt v objective, but only marginal when comparing pt v control in the overlap outcome to the same reference group.
 
 We then ran pairwise comparisons to know the following differences:
 
@@ -311,96 +290,48 @@ anova(meta_multi2, btt=5:6)
 
 The two contrasts are significantly different.
 
-The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition). The effect sizes for the interaction relate to the contrast, but cannot be used to find the effect.
+The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition) and if they differ from 0. These were obtained using emmeans.
 
-To get the effect sizes for each PT comparison in each outcome that would correspond to those pairwise comparisons, we need to run individual meta-analyses on the subsets of the data-set (as seen in McAuliffe meta-analysis).
+## Marginal means
 
-## Output from individual models to obtain estimates per comparison:
+```{r emmeans multi}
+qdrq1 <- qdrg(object = meta_multi2, data = meta_overall1)
 
-```{r meta models per multi subsets with I2}
-# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
-## Get labels for the function
-pt_filter1 <- c("pt_v_control", "pt_v_control", "pt_v_control", 
-                  "pt_v_objective", "pt_v_objective", "pt_v_objective") 
+emmeans_multi <- summary(emmeans(qdrq1, "pt_comparison","outcome_type"))
+emmeans_multi
 
-outcome_filter1 <- c("Stereotyping", "Overlap", "Interpersonal Feels",
-                     "Stereotyping", "Overlap", "Interpersonal Feels")
-
-## Get an empty list the length of the number of subsetted datasets we need
-df_4_overall <- list(length = length(pt_filter1))
-
-## The for loop getting us subsetted datasets
-for (i in seq_along(pt_filter1)){
-  df_4_overall[[i]] <- meta_overall1 %>%
-    filter(pt_comparison == pt_filter1[i] & 
-             outcome_type == outcome_filter1[i])
-  }
-
-# Mapping over each subsetted dataset to run the meta-analysis
-meta_output <- map(df_4_overall, ~rma.mv(dunb,
-                         var_dunb,
-                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
-                                        ~ 1 | outcome_scale_group),
-                         data = .x))
-
-# Overall I2 value for model
-I2_overall_multi <- get_I2_overall_clean(df_4_overall, meta_output)
-
-# I2 value per level of nested and crossed variance
-I2_var_levels <-map2(df_4_overall, meta_output, ~get_I2_var_levels(.x, .y))
-
-### Get column for between study hetereogeneity to put in table
-btw_I2_multi <- get_btw_study_I2(I2_var_levels)
-
-### Getting values for between outcome hetereogeneity (within outcome) for dataframe
-within_I2_multi <- get_within_study_I2(I2_var_levels)
-
-### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-crossed_I2_multi <- get_crossed_study_I2(I2_var_levels) 
-
-#Using extraction and cleaning functions I wrote, extract and clean data from model output
-k <- get_k_clean(meta_output)
-estimates <- get_ests_clean(meta_output)
-pval <- get_pval_clean(meta_output)
-ci_upper <- get_ci_upper_clean(meta_output)
-ci_lower <- get_ci_lower_clean(meta_output)
-Q_val <- get_Q_clean(meta_output)
-Q_pval <- get_Q_p_clean(meta_output)
-
-# Creating the labels for the dataframe
-comparison <- c("Pt vs Control in Stereotyping",
-                "PT vs Control in Overlap",
-                "PT vs Control in Interpersonal feelings",
-                "PT vs Objective in Stereotyping",
-                "PT vs Objective in Overlap",
-                "PT vs Objective in Interpersonal feelings")
-
-# Combinind everything into one dataframe
-multi_combined <- cbind(comparison, 
-                        k,
-                        estimates,
-                        pval,
-                        ci_upper,
-                        ci_lower,
-                        Q_val,
-                        Q_pval,
-                        I2_overall_multi,
-                        btw_I2_multi,
-                        within_I2_multi,
-                        crossed_I2_multi)
-
-knitr::kable(multi_combined)
+emmeans_multi %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  facet_grid(cols = vars(outcome_type)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Interaction effect on perspective taking comparison effects",
+       subtitle = "Higher effect sizes = more positive outcomes",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Vs Objective','Vs Control'))
 ```
 
-The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control, but again, we have more results included, and we are still in the same direction. 
+The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .54). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control (.29), but again, we have more results included. We also obtained our results in the interactive MLM model, not individual meta-analysis models as McAuliffe et al did. MLM models employ shrinkage on the estimates that would not occur when subsetting data down to the individual comparisons, which also accounts for differences between our results and McAuliffe results. This also allows us to retain a larger k.
 
-*Note for Sara H: This change from before for imagine-other vs no-instructions in the interpersonal feels category is due to me adding three effect sizes converted from correlation coefficients that I had previously forgot to convert... I guess they were outliers, since it increased from .16 to .27*
+For the categories other than Interpersonal Feels, none of the other comparisons are statistically different from 0. Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
+### I2 overall
 
-For the categories other than Interpersonal Feels, only the comparison of pt_v_control is statistically different from 0 for the Overlap/merging category. This is surprising and opposite of the pattern found in the interpersonal feelings category. The comparison of pt_v_objective is marginal, though the estimate itself is not much smaller. This is the category in which the number of studies included is small, which could be impacting these results. We will have to see if these differ from each other when analyzed in their own model.
+```{r overall I2 multi}
+get_I2_overall(meta_overall1, meta_multi2)
+```
 
+Overall heterogeneity is very high. 91.13% of the variance can be explained due to differences in the studies not explained by our predictors. 
 
-Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 multi}
+get_I2_var_levels(meta_overall1, meta_multi2)
+```
+
+Most of this heterogeneity is explained by between-study variance, followed by between-outcome (within-study) variance. 
 
 # Stereotyping
 
@@ -424,6 +355,8 @@ meta_stereo1 <- meta_data %>%
 meta_stereo1 %<>% 
   filter(outcome_type == "1")
 
+meta_stereo1$outcome_scale_group <- droplevels(meta_stereo1$outcome_scale_group)
+
 ## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
 meta_stereo2 <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison,
@@ -437,16 +370,18 @@ meta_stereo2 <- meta_data %>%
 
 meta_stereo2 %<>% 
   filter(outcome_type == "1")
+
+meta_stereo2$outcome_scale_group <- droplevels(meta_stereo2$outcome_scale_group)
 ```
 
-## Number of unique effect sizes
+## Unique effect sizes
 
 ```{r stereo effect size num}
 meta_stereo1 %>% 
   count()
 ```
 
-## Model looking at imagine-self vs imagine-other
+## Imagine-self vs imagine-other Model
 
 **Contrasts:**
 
@@ -455,7 +390,6 @@ contrasts(meta_stereo1$pt_comparison)
 ```
 
 ```{r stereo model imagine self vs other}
-# OVerall model across outcome type
 stereo_meta1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
@@ -465,11 +399,36 @@ stereo_meta1 <- rma.mv(dunb,
 stereo_meta1
 ```
 
+The intercept is not significantly different from zero, nor do any effects differ from it.
+
+### Marginal means
+
+```{r emmeans stereo1}
+qdrq_stereo1 <- qdrg(object = stereo_meta1, data = meta_stereo1)
+
+emmeans_stereo1 <- summary(emmeans(qdrq_stereo1, "pt_comparison"))
+emmeans_stereo1
+
+emmeans_stereo1 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Imagine-self vs other & objective vs control instructions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Self vs Objective','Self vs Control',
+                              'Other vs Objective', 'Other vs Control'))
+```
+
+None of the marginal means differ from zero. There is an interesting pattern in that self or other vs objective lead to higher effect sizes (less stereotype prejudice reduction). However, with nothing differing from zero, this does not mean anything statistically.
+
 ### I2 overall
 
 ```{r overall I2 stereo 1}
 get_I2_overall(meta_stereo1, stereo_meta1)
 ```
+
+Again, very high.
 
 ### I2 for levels of variance
 
@@ -479,77 +438,170 @@ get_I2_overall(meta_stereo1, stereo_meta1)
 get_I2_var_levels(meta_stereo1, stereo_meta1)
 ```
 
-The test of moderators is not significant, nor are any comparisons. The estimates do not provide us with estimates for each comparison, we will need to run individual models to examine this.
+Most of the heterogeneity is explained by between-studies variance, with about 16% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
 
-### Output from individual models to obtain estimates per comparison:
+## Moderators for imagine self vs other model
 
-```{r meta models for stereo 1 subsets}
-# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
-## Get labels for the function
-stereo_pt_filter1 <- c("self_v_objective", "self_v_control", 
-                      "other_v_objective", "other_v_control") 
+### Scales of measurement
 
+```{r stereo 1 mod1}
+meta_stereo1 %>% 
+  group_by(pt_comparison, outcome_scale_group) %>% 
+  count() %>% 
+  filter(n <2) 
 
-## Get an empty list the length of the number of subsetted datasets we need
-df_4_stereo1 <- list(length = length(stereo_pt_filter1))
+#getting rid of cells with only 1
+meta_stereo1_mod1_dat <- meta_stereo1 %>% 
+  filter(!c(pt_comparison == "self_v_objective" & outcome_scale_group == "1" |
+           pt_comparison == "self_v_control" & outcome_scale_group == "1"))
 
-## The for loop getting us subsetted datasets
-for (i in seq_along(stereo_pt_filter1)){ # change () in seq_along to filters
-  df_4_stereo1[[i]] <- meta_stereo1 %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
-    filter(pt_comparison == stereo_pt_filter1[i]) # change () in seq_along to filters
-  }
+stereo_meta1_mod1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo1_mod1_dat)
 
-# Mapping over each subsetted dataset to run the meta-analysis
-stereosub_output1 <- map(df_4_stereo1, ~rma.mv(dunb,
-                         var_dunb,
-                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
-                                        ~ 1 | outcome_scale_group),
-                         data = .x))
+stereo_meta1_mod1
 
-# Overall I2 value for model
-I2_overall_stereo1 <- get_I2_overall_clean(df_4_stereo1, stereosub_output1)
-
-# I2 value per level of nested and crossed variance
-I2_var_levels_stereo1 <-map2(df_4_stereo1, stereosub_output1, ~get_I2_var_levels(.x, .y))
-
-### Get column for between study hetereogeneity to put in table
-btw_I2_stereo1 <- get_btw_study_I2(I2_var_levels_stereo1)
-
-### Getting values for between outcome hetereogeneity (within outcome) for dataframe
-within_I2_stereo1 <- get_within_study_I2(I2_var_levels_stereo1)
-
-### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-crossed_I2_stereo1 <- get_crossed_study_I2(I2_var_levels_stereo1) 
-
-#Using extraction and cleaning functions I wrote, extract and clean data from model output
-k_stereo1 <- get_k_clean(stereosub_output1)
-estimates_stereo1 <- get_ests_clean(stereosub_output1)
-pval_stereo1 <- get_pval_clean(stereosub_output1)
-ci_upper_stereo1 <- get_ci_upper_clean(stereosub_output1)
-ci_lower_stereo1 <- get_ci_lower_clean(stereosub_output1)
-Q_val_stereo1 <- get_Q_clean(stereosub_output1)
-Q_pval_stereo1 <- get_Q_p_clean(stereosub_output1)
-
-# Creating the labels for the dataframe
-comparison_stereo1 <- c("self_v_objective", "self_v_control",
-                "other_v_objective", "other_v_control") 
-
-# Combinind everything into one dataframe
-stereo1_combined <- cbind(comparison_stereo1,
-                          k_stereo1,
-                          estimates_stereo1,
-                          pval_stereo1,
-                          ci_upper_stereo1,
-                          ci_lower_stereo1,
-                          Q_val_stereo1,
-                          Q_pval_stereo1,
-                          I2_overall_stereo1,
-                          btw_I2_stereo1,
-                          within_I2_stereo1,
-                          crossed_I2_stereo1)
-
-knitr::kable(stereo1_combined)
 ```
+
+I dropped cells with only 1 study and rma.mv dropped cells with 0. Nothing is significant from one another, and the intercept is not significantly different from 0. Any model with redudancies (0's in cells) cannot be modeled using emmeans to get marginal means.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod scales}
+get_I2_overall(meta_stereo1_mod1_dat, stereo_meta1_mod1)
+```
+
+Still very high, but slightly lower than without the moderater.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod scales}
+get_I2_var_levels(meta_stereo1_mod1_dat, stereo_meta1_mod1)
+```
+
+Without the crossed variance structure (because it is a moderator), more of that variance shifted to the between-conditions level. Most of the variance is still represented by the between-studies level.
+
+### Target moderator - information amount
+
+```{r stereo 1 mod2}
+stereo_meta1_mod2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1_mod2
+```
+
+Nothing is significant.
+
+```{r emmeans stereo1 mod2 }
+qdrq_stereo1_mod2 <- qdrg(object = stereo_meta1_mod2, data = meta_stereo1)
+
+emmeans_stereo1_mod2 <- summary(emmeans(qdrq_stereo1_mod2, "pt_comparison", "target_information"))
+emmeans_stereo1_mod2
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by target information.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod2}
+get_I2_overall(meta_stereo1, stereo_meta1_mod2)
+```
+
+Compared to the original stereotyping model this is moderator, the overall heterogeneity is slightly higher.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod2}
+get_I2_var_levels(meta_stereo1, stereo_meta1_mod2)
+```
+
+Most of the variance is between-studies, with a somewhat significant amount explained by between-outcome (within-study) variance.
+
+### Target moderator - target out-group
+
+```{r stereo 1 mod3}
+stereo1_group_data <- meta_stereo1 %>% 
+  select(dunb, var_dunb, pt_comparison, target_out_minor, sample_number_total,
+         outcomes_within_sample_var, conditions_within_sample_var, outcome_scale_group) %>% 
+  na.omit()
+
+stereo_meta1_mod3 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = stereo1_group_data)
+
+stereo_meta1_mod3
+```
+
+Nothing is significant.
+
+```{r emmeans stereo1 mod3}
+qdrq_stereo1_mod3 <- qdrg(object = stereo_meta1_mod3, data = stereo1_group_data)
+
+emmeans_stereo1_mod3 <- summary(emmeans(qdrq_stereo1_mod3, "pt_comparison", "target_out_minor"))
+emmeans_stereo1_mod3
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by by target group.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod3}
+get_I2_overall(stereo1_group_data, stereo_meta1_mod3)
+```
+
+About the same as the original model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod3}
+get_I2_var_levels(stereo1_group_data, stereo_meta1_mod3)
+```
+
+Most of the variance is explained by between-studies or between-conditions (within-study) variance. Interestingly, there is 0% variance explained by between-outcomes variance.
+
+### Sample size
+
+```{r stereo 1 mod4}
+stereo_meta1_mod4 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1_mod4
+```
+
+Sample size does not interact with pt comparison.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod4}
+get_I2_overall(meta_stereo1, stereo_meta1_mod4)
+```
+
+Heterogeneity is about the same as the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod4}
+get_I2_var_levels(meta_stereo1, stereo_meta1_mod4)
+```
+
+Most variance is explained by between-studies variance, followed by between-outcomes (within-study) variance.
 
 ## Model comparing "day in the life," other control, and objective comparisons
 
@@ -570,20 +622,6 @@ stereo_meta2 <- rma.mv(dunb,
 stereo_meta2
 ```
 
-### Overall I2
-
-```{r overall I2 stereo 2}
-get_I2_overall(meta_stereo2, stereo_meta2)
-```
-
-### I2 for levels of variance
-
-*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
-
-```{r levels I2 stereo 2}
-get_I2_var_levels(meta_stereo2, stereo_meta2)
-```
-
 Pairwise comparisons to compare:
 
 * pt_v_objective to pt_v_other control
@@ -594,74 +632,200 @@ anova(stereo_meta2, btt=2:3)
 
 They do not significantly differ.
 
-### Output from individual models to obtain estimates per comparison:
+### Marginal means
 
-```{r meta models for stereo 2 subsets}
-# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
-## Get labels for the function
-stereo_pt_filter2 <- c("pt_v_day_control", "pt_v_other_control",
-                       "pt_v_objective") 
+```{r emmeans stereo2}
+qdrq_stereo2 <- qdrg(object = stereo_meta2, data = meta_stereo2)
 
-## Get an empty list the length of the number of subsetted datasets we need
-df_4_stereo2 <- list(length = length(stereo_pt_filter2))
+emmeans_stereo2 <- summary(emmeans(qdrq_stereo2, "pt_comparison"))
+emmeans_stereo2
 
-## The for loop getting us subsetted datasets
-for (i in seq_along(stereo_pt_filter2)){ # change () in seq_along to filters
-  df_4_stereo2[[i]] <- meta_stereo2 %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
-    filter(pt_comparison == stereo_pt_filter2[i]) # change () in seq_along to filters
-  }
-
-# Mapping over each subsetted dataset to run the meta-analysis
-stereosub_output2 <- map(df_4_stereo2, ~rma.mv(dunb,
-                         var_dunb,
-                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
-                                        ~ 1 | outcome_scale_group),
-                         data = .x))
-
-# Overall I2 value for model
-I2_overall_stereo2 <- get_I2_overall_clean(df_4_stereo2, stereosub_output2)
-
-# I2 value per level of nested and crossed variance
-I2_var_levels_stereo2 <-map2(df_4_stereo2, stereosub_output2, ~get_I2_var_levels(.x, .y))
-
-### Get column for between study hetereogeneity to put in table
-btw_I2_stereo2 <- get_btw_study_I2(I2_var_levels_stereo2)
-
-### Getting values for between outcome hetereogeneity (within outcome) for dataframe
-within_I2_stereo2 <- get_within_study_I2(I2_var_levels_stereo2)
-
-### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-crossed_I2_stereo2 <- get_crossed_study_I2(I2_var_levels_stereo2) 
-
-#Using extraction and cleaning functions I wrote, extract and clean data from model output
-k_stereo2 <- get_k_clean(stereosub_output2)
-estimates_stereo2 <- get_ests_clean(stereosub_output2)
-pval_stereo2 <- get_pval_clean(stereosub_output2)
-ci_upper_stereo2 <- get_ci_upper_clean(stereosub_output2)
-ci_lower_stereo2 <- get_ci_lower_clean(stereosub_output2)
-Q_val_stereo2 <- get_Q_clean(stereosub_output2)
-Q_pval_stereo2 <- get_Q_p_clean(stereosub_output2)
-
-# Creating the labels for the dataframe
-comparison_stereo2 <- c("pt_v_day_control", "pt_v_other_control",
-                       "pt_v_objective") 
-
-# Combinind everything into one dataframe
-stereo2_combined <- cbind(comparison_stereo2,
-                         k_stereo2,
-                         estimates_stereo2,
-                         pval_stereo2,
-                         ci_upper_stereo2,
-                         ci_lower_stereo2,
-                         Q_val_stereo2,
-                         Q_pval_stereo2,
-                         I2_overall_stereo2,
-                         btw_I2_stereo2,
-                         within_I2_stereo2,
-                         crossed_I2_stereo2)
-
-knitr::kable(stereo2_combined)
+emmeans_stereo2 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "'Day in the life' control vs other comparison conditions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Vs `Day in the life` control','Vs other control',
+                              'Vs objective'))
 ```
+
+The marginal means do not differ from 0.
+
+### Overall I2
+
+```{r overall I2 stereo 2}
+get_I2_overall(meta_stereo2, stereo_meta2)
+```
+
+Heterogeneity is high.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 stereo 2}
+get_I2_var_levels(meta_stereo2, stereo_meta2)
+```
+
+Most hetereogeneity is explained by between-study variance, followed by between-condition variance.
+
+## Moderators for "day in the life" model
+
+### Scales of measurement
+
+```{r stereo 2 mod1}
+stereo_meta2_mod1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo2)
+
+stereo_meta2_mod1
+```
+
+Nothing is significant from one another, and the intercept is not significantly different from 0. Outcome scale group 5 (Essay stereotypicality) is marginally different from the intercept outcome scale group 1 (IAT). Rma.mv dropped cells with 0 due to redundancies, and therefore cannot be modeled in emmeans.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod scales}
+get_I2_overall(meta_stereo2, stereo_meta2_mod1)
+```
+
+About the same as the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod scales}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod1)
+```
+
+Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
+
+### Target moderator - information amount
+
+```{r stereo 2 mod2}
+stereo_meta2_mod2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2_mod2
+```
+
+Pt v other control with medium target information is marginally different from the intercept (p vs "day  in the life" control with impoverished information). Nothing else is significant from the intercept, nor is the intercept significant.
+
+#### Marginal means
+
+```{r emmeans stereo1 mod2 }
+qdrq_stereo2_mod2 <- qdrg(object = stereo_meta2_mod2, data = meta_stereo2)
+
+emmeans_stereo2_mod2 <- summary(emmeans(qdrq_stereo2_mod2, "pt_comparison", "target_information"))
+emmeans_stereo2_mod2
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by target information.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod2}
+get_I2_overall(meta_stereo2, stereo_meta2_mod2)
+```
+
+Slightly higher than the original model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod2}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod2)
+```
+
+Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
+
+### Target moderator - target out-group
+
+```{r stereo 1 mod3}
+stereo2_group_data <- meta_stereo1 %>% 
+  select(dunb, var_dunb, pt_comparison, target_out_minor, sample_number_total,
+         outcomes_within_sample_var, conditions_within_sample_var, outcome_scale_group) %>% 
+  na.omit()
+
+stereo_meta2_mod3 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = stereo2_group_data)
+
+stereo_meta2_mod3
+```
+
+Nothing is significant.
+
+#### Marginal means
+
+```{r emmeans stereo1 mod3}
+qdrq_stereo2_mod3 <- qdrg(object = stereo_meta2_mod3, data = stereo2_group_data)
+
+emmeans_stereo2_mod3 <- summary(emmeans(qdrq_stereo2_mod3, "pt_comparison", "target_out_minor"))
+emmeans_stereo2_mod3
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by by target group.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod3}
+get_I2_overall(stereo2_group_data, stereo_meta2_mod3)
+```
+
+About the same as the model without moderaters.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod3}
+get_I2_var_levels(stereo2_group_data, stereo_meta2_mod3)
+```
+
+Most heterogeneity explained by between-studies variance, or between-conditions variance.
+
+### Sample size
+
+```{r stereo 1 mod4}
+stereo_meta2_mod4 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2_mod4
+```
+
+Sample size does not interact with pt comparison. None of the effects are significant.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod4}
+get_I2_overall(meta_stereo2, stereo_meta2_mod4)
+```
+
+Heterogeneity is the same as in the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod4}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod4)
+```
+
+Hetereogeneity is explained by between-studies variance the most, followed almost equally by between-conditions and between-outcomes variance.
 
 # Overlap
 
@@ -707,6 +871,9 @@ contrasts(overlap_data$pt_comparison)
 ```
 
 ```{r overlap model pt}
+overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
+levels(overlap_data$outcome_scale_group)
+
 overlap_pt <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
@@ -730,7 +897,145 @@ get_I2_var_levels(overlap_data, overlap_pt)
 get_I2_overall(overlap_data, overlap_pt)
 ```
 
-Since this comparison is the same as the overall multivariate model, we already have the subsetted dataset results per each comparison.
+```{r emmeans overlap}
+qdrq_overlap <- qdrg(object = overlap_pt, data = overlap_data)
+
+emmeans_overlap <- summary(emmeans(qdrq_overlap, "pt_comparison"))
+emmeans_overlap 
+```
+
+This comparison is the same as the overall model. Without the interaction, the values change slightly, but the pattern and significance do not.
+
+## Moderators
+
+### Scale of measurement
+
+```{r r feels model pt}
+overlap_data %>% 
+  group_by(outcome_scale_group) %>% 
+  count()
+
+overlap_model_mod1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = overlap_data)
+
+overlap_model_mod1
+
+get_I2_overall(overlap_data, overlap_model_mod1)
+```
+
+Scale 7 (Self-report IOS merging/scales) while in the pt vs objective comparison is the reference group. There are simple effects in which the effect sizes become significantly lower for the pt vs objective comparison when merging is measured from overlap of traits/attributes or measures of social distancing. There are no interactions. 
+
+The marginal main effects are reported below. When using a self-reported merging scale both pt vs objective and control lead to medium to large effect sizes that differed from 0. When using both the attribution and social distance scales, neither comparison significantly differed from 0.
+
+```{r emmeans feels scale}
+qdrq_overlap2 <- qdrg(object = overlap_model_mod1, data = overlap_data)
+
+emmeans_overlap2 <- summary(emmeans(qdrq_overlap2, "pt_comparison", "outcome_scale_group"))
+emmeans_overlap2
+```
+
+### Target - amount of information
+
+```{r}
+overlap_model_mod2 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = overlap_data)
+
+overlap_model_mod2
+
+get_I2_overall(overlap_data, overlap_model_mod2)
+```
+
+None are significant. I2 lowered. With there being no redundcies in the model, I wonder if we can model an interaction with scale?
+
+```{r emmeans overlap in-group targ mod}
+qdrq_overlap3 <- qdrg(object = overlap_model_mod2, data = overlap_data)
+
+emmeans_overlap3 <- summary(emmeans(qdrq_overlap2, "pt_comparison", "target_information"))
+emmeans_overlap3
+```
+
+When target information is impoverished and pt is compared to the control, the effect significantly differs from 0 and is medium-sized. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a large effect size. 
+
+```{r}
+#Modeled target information as a main effect since it had no interactions and, because, when I tried to model it with interactions it led to redundancies
+
+overlap_data %>% 
+  group_by(pt_comparison, outcome_scale_group, target_information) %>% 
+  count() 
+
+2*3*3
+
+#Should be 18 but there are 13, so the redundancies come from the fact that there are cells with 0 in it, which rma.mv is dropping: https://stats.stackexchange.com/questions/223918/multilevel-metaregression-in-r-redundant-predictors-dropped-metafor
+
+overlap_model_mod3 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = overlap_data)
+
+overlap_model_mod3
+
+get_I2_overall(overlap_data, overlap_model_mod3)
+```
+
+The I2 decreases having all three predictors in the model, though it is concerning that some cells are 0 and that was causing redundcies. 
+
+### Target - In-group target grouping (relevant to outcome category)
+
+```{r}
+overlap_data <- overlap_data %>% 
+  filter(target_ingroup_nonspecific == "1" | target_ingroup_nonspecific == "2")
+
+overlap_data$target_ingroup_nonspecific <- droplevels(overlap_data$target_ingroup_nonspecific)
+
+overlap_model_mod4 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_ingroup_nonspecific,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
+
+overlap_model_mod4
+
+get_I2_overall(overlap_data, overlap_model_mod4)
+```
+
+Tried running an out-group moderator model as well, but it had a convergence issue.
+
+The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept.
+
+
+```{r emmeans overlap in-group targ mod}
+qdrq_overlap4 <- qdrg(object = overlap_model_mod4, data = overlap_data)
+
+emmeans_overlap4 <- summary(emmeans(qdrq_overlap3, "pt_comparison", "target_ingroup_nonspecific"))
+emmeans_overlap4
+```
+
+The marginal means indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-signfiant and are about the same regardless of if pt is being compared to the objective or control condition. Both are lower than the in-group effect sizes.
+
+### Sample size
+
+```{r sample size mod overlap}
+overlap_model_mod5 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
+
+overlap_model_mod5
+
+get_I2_overall(overlap_data, overlap_model_mod5)
+```
+
+Intercept different from 0. No interaction with sample size.
 
 # Interpersonal Feelings
 
@@ -769,7 +1074,7 @@ feels %>%
   count()
 ```
 
-19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims.
+19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims. I want to look at these comparisons because they speak to McAuliffe et al's meta-analytic results.
 
 ## Model results
 
@@ -780,6 +1085,8 @@ contrasts(feels$pt_comparison)
 ```
 
 ```{r r feels model pt}
+feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
+
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
@@ -792,7 +1099,7 @@ feels_model
 ### Overall I2 for model
 
 ```{r overall I2 feels}
-get_I2_var_levels(feels, feels_model)
+get_I2_overall(feels, feels_model)
 ```
 
 ### I2 for levels of variance
@@ -800,71 +1107,128 @@ get_I2_var_levels(feels, feels_model)
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r levels I2 feels}
-get_I2_overall(feels, feels_model)
+get_I2_var_levels(feels, feels_model)
 ```
 
-### Output from individual models to obtain estimates per comparison:
+```{r emmeans feels breakdown}
+qdrq_feels1 <- qdrg(object = feels_model, data = feels)
 
-```{r meta models for feels subsets}
-# Get subsets of the overall dataset corresponding to each comparison & run meta-analyses on each
-## Get labels for the function
-comparisons_feels <- c("self_v_objective", "self_v_control", 
-                      "other_v_objective", "other_v_control") 
+emmeans_feels1 <- summary(emmeans(qdrq_feels1, "pt_comparison"))
+emmeans_feels1
 
-
-## Get an empty list the length of the number of subsetted datasets we need
-df_4_feels <- list(length = length(comparisons_feels))
-
-## The for loop getting us subsetted datasets
-for (i in seq_along(comparisons_feels)){ # change () in seq_along to filters
-  df_4_feels[[i]] <- feels %>%  # change data that is subsetted [[i]] to the empty list above & change the piped data to the correct cleaned dataset for this analysis
-    filter(pt_comparison == comparisons_feels[i]) # change () in seq_along to filters
-  }
-
-# Mapping over each subsetted dataset to run the meta-analysis
-feels_sub_output <- map(df_4_feels, ~rma.mv(dunb,
-                         var_dunb,
-                         random = list( ~ 1 | sample_number_total/outcomes_within_sample_var,
-                                        ~ 1 | outcome_scale_group),
-                         data = .x))
-
-# Overall I2 value for model
-I2_overall_feels <- get_I2_overall_clean(df_4_feels, feels_sub_output)
-
-# I2 value per level of nested and crossed variance
-I2_var_levels_feels <-map2(df_4_feels, feels_sub_output, ~get_I2_var_levels(.x, .y))
-
-### Get column for between study hetereogeneity to put in table
-btw_I2_feels <- get_btw_study_I2(I2_var_levels_feels)
-
-### Getting values for between outcome hetereogeneity (within outcome) for dataframe
-within_I2_feels <- get_within_study_I2(I2_var_levels_feels)
-
-### Getting values for crossed scale hetereogeneity into dataframe column to put in table later
-crossed_I2_feels <- get_crossed_study_I2(I2_var_levels_feels) 
-
-#Using extraction and cleaning functions I wrote, extract and clean data from model output
-k_feels <- get_k_clean(feels_sub_output)
-estimates_feels <- get_ests_clean(feels_sub_output)
-pval_feels <- get_pval_clean(feels_sub_output)
-ci_upper_feels <- get_ci_upper_clean(feels_sub_output)
-ci_lower_feels <- get_ci_lower_clean(feels_sub_output)
-Q_val_feels <- get_Q_clean(feels_sub_output)
-Q_pval_feels <- get_Q_p_clean(feels_sub_output)
-
-# Combining everything into one dataframe
-feels_combined <- cbind(comparisons_feels,
-                        k_feels,
-                        estimates_feels,
-                        pval_feels,
-                        ci_upper_feels,
-                        ci_lower_feels,
-                        Q_val_feels,
-                        Q_pval_feels,
-                        I2_overall_feels,
-                        btw_I2_feels,
-                        within_I2_feels,
-                        crossed_I2_feels)
-
-knitr::kable(feels_combined)
+emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Imagine-self vs other & objective vs control instructions in interpersonal only",
+       subtitle = "higher effect sizes = better outcome",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Self vs Objective','Self vs Control',
+                              'Other vs Objective', 'Other vs Control'))
 ```
+
+## Moderators
+
+### Scale of measurement
+
+```{r r feels model pt}
+levels(feels$outcome_scale_group)
+
+feels %>% 
+  group_by(outcome_scale_group) %>% 
+  count()
+
+feels_mod <- feels %>% 
+  filter(outcome_scale_group != 16) %>% 
+  unique()
+
+feels_mod$outcome_scale_group <- droplevels(feels_mod$outcome_scale_group)
+
+#model with interaction
+feels_model_mod1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = feels_mod)
+
+feels_model_mod1
+
+get_I2_overall(feels_mod, feels_model_mod1)
+
+#model with no interaction for emmeans object
+feels_model_mod1_noint <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison + outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = feels_mod)
+
+feels_model_mod1_noint 
+```
+
+Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons in the interaction contrasts (only ran one interaction estimate for scale group 13 and 15). There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). Scale of measurement only lowered the I2 by 2%. 
+
+```{r emmeans feels scale}
+#Emmeans could not run on the interaction model because of the redundancies that were dropped, so re-ran the model without the interactions since none were significant
+qdrq_feels2 <- qdrg(object = feels_model_mod1_noint, data = feels_mod)
+
+emmeans_feels2 <- summary(emmeans(qdrq_feels2, "pt_comparison", "outcome_scale_group"))
+emmeans_feels2
+```
+
+### Target - amount of information
+
+```{r}
+feels_model_mod2 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod2
+
+get_I2_overall(feels_mod, feels_model_mod2)
+```
+
+None are significant. Emmeans won't work because redundant predictors were dropped from ram.mv model.
+
+### Target - In need/In distress target grouping (relevant to outcome category)
+
+```{r}
+feels_model_mod3 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_emapthetic_need,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod3
+
+get_I2_overall(feels_mod, feels_model_mod3)
+```
+
+```{r emmeans feels empathetic need targ mod}
+#Emmeans could not run on the interaction model because of the redundancies that were dropped, so re-ran the model without the interactions since none were significant
+qdrq_feels3 <- qdrg(object = feels_model_mod3, data = feels_mod)
+
+emmeans_feels3 <- summary(emmeans(qdrq_feels3, "pt_comparison", "target_emapthetic_need"))
+emmeans_feels3
+```
+
+### Sample size
+
+```{r sample size mod overlap}
+feels_model_mod4 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod4
+
+get_I2_overall(feels_mod, feels_model_mod4)
+get_I2_var_levels(feels_mod, feels_model_mod4)
+```
+
+Intercept different from 0. No interaction with sample size.
