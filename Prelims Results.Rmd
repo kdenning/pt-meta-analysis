@@ -29,6 +29,7 @@ editor_options:
 #install.packages("multcomp")
 #install.packages("car")
 #install.packages("emmeans")
+#install.packages("metapower")
 library(rio)
 library(here)
 library(magrittr)
@@ -43,6 +44,7 @@ library(multcomp)
 library(car)
 library(tidyverse)
 library(emmeans)
+library(metapower)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -236,6 +238,18 @@ meta_overall1 %>%
   count()
 ```
 
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell multi}
+meta_overall1 %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
 ### Effect sizes per outcome category
 
 ```{r}
@@ -333,6 +347,20 @@ get_I2_var_levels(meta_overall1, meta_multi2)
 
 Most of this heterogeneity is explained by between-study variance, followed by between-outcome (within-study) variance. 
 
+### Post-hoc Power
+
+* The effect sizes are obtained from the marginal means for each of the cells
+* Sample size is the average found earlier (n = 59) to the nearest number the r function would take
+* k is using all effect sizes coded (375)
+
+```{r power multi}
+subgroup_power(n_groups = 6, 
+               effect_sizes = c(.54, .30, .34, .30, -.07, -.01), 
+               sample_size = 120,
+               k = 375,
+               es_type = "d")
+```
+
 # Stereotyping
 
 ```{r stereo model data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
@@ -379,6 +407,27 @@ meta_stereo2$outcome_scale_group <- droplevels(meta_stereo2$outcome_scale_group)
 ```{r stereo effect size num}
 meta_stereo1 %>% 
   count()
+```
+
+### Number of unique samples
+
+```{r}
+meta_stereo1 %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell stereo}
+meta_stereo1 %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
 ```
 
 ## Imagine-self vs imagine-other Model
@@ -439,6 +488,20 @@ get_I2_var_levels(meta_stereo1, stereo_meta1)
 ```
 
 Most of the heterogeneity is explained by between-studies variance, with about 16% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
+
+### Post-hoc power
+
+* k = 138 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power stereo 1}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(.08, -.08, .02, -.11), 
+               sample_size = 100,
+               k = 138,
+               es_type = "d")
+```
 
 ## Moderators for imagine self vs other model
 
@@ -671,6 +734,20 @@ get_I2_var_levels(meta_stereo2, stereo_meta2)
 
 Most hetereogeneity is explained by between-study variance, followed by between-condition variance.
 
+### Post-hoc power
+
+* k = 138 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power stereo 2}
+subgroup_power(n_groups = 3, 
+               effect_sizes = c(.00, -.03, .10), 
+               sample_size = 99,
+               k = 138,
+               es_type = "d")
+```
+
 ## Moderators for "day in the life" model
 
 ### Scales of measurement
@@ -874,6 +951,27 @@ overlap_data %>%
   count()
 ```
 
+### Number of unique samples
+
+```{r overlap samples}
+overlap_data %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell overlap}
+overlap_data %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
 ## Results
 
 *Note: this comparison is the same as in the overall model interacting with outcome types, as the small k per cell in the overlap/merging category was the reason we had to collapse cross other perspective taking comparisons in that overall model.*
@@ -926,7 +1024,21 @@ This heterogeneity is still high, but lower than with the stereotyping outcome o
 get_I2_var_levels(overlap_data, overlap_pt)
 ```
 
-Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed struture.
+Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed structure.
+
+### Post-hoc power
+
+* k = 48 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power overlap}
+subgroup_power(n_groups = 2, 
+               effect_sizes = c(.40, .33), 
+               sample_size = 132,
+               k = 48,
+               es_type = "d")
+```
 
 ## Moderators
 
@@ -1183,6 +1295,27 @@ feels %>%
 
 19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims. I want to look at these comparisons because they speak to McAuliffe et al's meta-analytic results.
 
+### Number of unique samples
+
+```{r overlap samples}
+feels %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell overlap}
+feels %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
 ## Model results
 
 **Contrasts:**
@@ -1243,6 +1376,20 @@ get_I2_var_levels(feels, feels_model)
 ```
 
 Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
+
+### Post-hoc power
+
+* k = 184 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power feels}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(.51, .26, .55, .29), 
+               sample_size = 124,
+               k = 184,
+               es_type = "d")
+```
 
 ## Moderators
 
