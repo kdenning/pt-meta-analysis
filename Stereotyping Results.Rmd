@@ -62,7 +62,7 @@ options(scipen=999)
 converted_data <- import("converted_data.csv") 
 
 # Importing functions I wrote from R document in this project
-source("meta_functions.R")
+source("functions/meta_functions.R")
 
 # data prep
 meta_data <- meta_clean_func(converted_data)
