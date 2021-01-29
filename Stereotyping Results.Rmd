@@ -1,0 +1,624 @@
+---
+title: "Stereotyping"
+author: "Kathryn Denning"
+date: "1/29/2021"
+output: html_document
+---
+
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+#install.packages("emmeans")
+#install.packages("metapower")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(emmeans)
+library(metapower)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+options(scipen=999)
+
+# importing data
+converted_data <- import("converted_data.csv") 
+
+# Importing functions I wrote from R document in this project
+source("meta_functions.R")
+
+# data prep
+meta_data <- meta_clean_func(converted_data)
+```
+
+# Stereotyping
+
+```{r stereo model data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+## creating dataset collapsing across "day in the life" versus "other control"
+meta_stereo1 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      self_v_control = c("1", "2"),
+                                      self_v_objective = c("3"),
+                                      other_v_control = c( "5", "6"),
+                                      other_v_objective = c("7"))) %>% 
+  filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
+           pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison))) %>% 
+  mutate(pt_comparison = fct_relevel(pt_comparison, 
+                                     "self_v_objective",
+                                     "self_v_control",
+                                     "other_v_objective",
+                                     "other_v_control"))
+meta_stereo1 %<>% 
+  filter(outcome_type == "1")
+
+meta_stereo1$outcome_scale_group <- droplevels(meta_stereo1$outcome_scale_group)
+
+## creating dataset collapsing across imagine-self and other to examine "day in the life" versus "other control"
+meta_stereo2 <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison,
+                                      pt_v_day_control = c("1", "5"),
+                                      pt_v_other_control = c("2", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_day_control" |
+           pt_comparison == "pt_v_other_control" |
+           pt_comparison == "pt_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+meta_stereo2 %<>% 
+  filter(outcome_type == "1")
+
+meta_stereo2$outcome_scale_group <- droplevels(meta_stereo2$outcome_scale_group)
+```
+
+## Unique effect sizes
+
+```{r stereo effect size num}
+meta_stereo1 %>% 
+  count()
+```
+
+### Number of unique samples
+
+```{r}
+meta_stereo1 %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell stereo}
+meta_stereo1 %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+## Imagine-self vs imagine-other Model
+
+**Contrasts:**
+
+```{r stereo1 conrasts}
+contrasts(meta_stereo1$pt_comparison) 
+```
+
+```{r stereo model imagine self vs other}
+stereo_meta1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1
+```
+
+The intercept is not significantly different from zero, nor do any effects differ from it.
+
+### Marginal main effects
+
+```{r emmeans stereo1}
+qdrq_stereo1 <- qdrg(object = stereo_meta1, data = meta_stereo1)
+
+emmeans_stereo1 <- summary(emmeans(qdrq_stereo1, "pt_comparison"))
+emmeans_stereo1
+
+emmeans_stereo1 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Imagine-self vs other & objective vs control instructions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Self vs Objective','Self vs Control',
+                              'Other vs Objective', 'Other vs Control'))
+```
+
+None of the marginal main effects differ from zero. There is an interesting pattern in that self or other vs objective lead to higher effect sizes (less stereotype prejudice reduction). However, with nothing differing from zero, this does not mean anything statistically.
+
+### I2 overall
+
+```{r overall I2 stereo 1}
+get_I2_overall(meta_stereo1, stereo_meta1)
+```
+
+Again, very high.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 stereo 1}
+get_I2_var_levels(meta_stereo1, stereo_meta1)
+```
+
+Most of the heterogeneity is explained by between-studies variance, with about 16% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
+
+### Post-hoc power
+
+* k = 138 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power stereo 1}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(.08, -.08, .02, -.11), 
+               sample_size = 100,
+               k = 138,
+               es_type = "d")
+```
+
+## Moderators for imagine self vs other model
+
+### Scales of measurement
+
+```{r stereo 1 mod1}
+meta_stereo1 %>% 
+  group_by(pt_comparison, outcome_scale_group) %>% 
+  count() %>% 
+  filter(n <2) 
+
+#getting rid of cells with only 1
+meta_stereo1_mod1_dat <- meta_stereo1 %>% 
+  filter(!c(pt_comparison == "self_v_objective" & outcome_scale_group == "1" |
+           pt_comparison == "self_v_control" & outcome_scale_group == "1"))
+
+stereo_meta1_mod1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo1_mod1_dat)
+
+stereo_meta1_mod1
+
+```
+
+I dropped cells with only 1 study and rma.mv dropped cells with 0. Nothing is significant from one another, and the intercept is not significantly different from 0. Any model with redudancies (0's in cells) cannot be modeled using emmeans to get marginal means.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod scales}
+get_I2_overall(meta_stereo1_mod1_dat, stereo_meta1_mod1)
+```
+
+Still very high, but slightly lower than without the moderater.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod scales}
+get_I2_var_levels(meta_stereo1_mod1_dat, stereo_meta1_mod1)
+```
+
+Without the crossed variance structure (because it is a moderator), more of that variance shifted to the between-conditions level. Most of the variance is still represented by the between-studies level.
+
+### Target moderator - information amount
+
+```{r stereo 1 mod2}
+stereo_meta1_mod2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1_mod2
+```
+
+Nothing is significant.
+
+```{r emmeans stereo1 mod2 }
+qdrq_stereo1_mod2 <- qdrg(object = stereo_meta1_mod2, data = meta_stereo1)
+
+emmeans_stereo1_mod2 <- summary(emmeans(qdrq_stereo1_mod2, "pt_comparison", "target_information"))
+emmeans_stereo1_mod2
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal main effects when broken down by target information.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod2}
+get_I2_overall(meta_stereo1, stereo_meta1_mod2)
+```
+
+Compared to the original stereotyping model this is moderator, the overall heterogeneity is slightly higher.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod2}
+get_I2_var_levels(meta_stereo1, stereo_meta1_mod2)
+```
+
+Most of the variance is between-studies, with a somewhat significant amount explained by between-outcome (within-study) variance.
+
+### Target moderator - target out-group
+
+```{r stereo 1 mod3}
+stereo1_group_data <- meta_stereo1 %>% 
+  select(dunb, var_dunb, pt_comparison, target_out_minor, sample_number_total,
+         outcomes_within_sample_var, conditions_within_sample_var, outcome_scale_group) %>% 
+  na.omit()
+
+stereo_meta1_mod3 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = stereo1_group_data)
+
+stereo_meta1_mod3
+```
+
+Nothing is significant.
+
+```{r emmeans stereo1 mod3}
+qdrq_stereo1_mod3 <- qdrg(object = stereo_meta1_mod3, data = stereo1_group_data)
+
+emmeans_stereo1_mod3 <- summary(emmeans(qdrq_stereo1_mod3, "pt_comparison", "target_out_minor"))
+emmeans_stereo1_mod3
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal main effects when broken down by by target group.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod3}
+get_I2_overall(stereo1_group_data, stereo_meta1_mod3)
+```
+
+About the same as the original model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod3}
+get_I2_var_levels(stereo1_group_data, stereo_meta1_mod3)
+```
+
+Most of the variance is explained by between-studies or between-conditions (within-study) variance. Interestingly, there is 0% variance explained by between-outcomes variance.
+
+### Sample size
+
+```{r stereo 1 mod4}
+stereo_meta1_mod4 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+
+stereo_meta1_mod4
+```
+
+Sample size does not interact with pt comparison.
+
+#### I2 overall
+
+```{r I2 overall stereo1 mod4}
+get_I2_overall(meta_stereo1, stereo_meta1_mod4)
+```
+
+Heterogeneity is about the same as the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere1 mod4}
+get_I2_var_levels(meta_stereo1, stereo_meta1_mod4)
+```
+
+Most variance is explained by between-studies variance, followed by between-outcomes (within-study) variance.
+
+## Model comparing "day in the life," other control, and objective comparisons
+
+**Contrasts:**
+
+```{r stereo2 contrasts}
+contrasts(meta_stereo2$pt_comparison) 
+```
+
+```{r stereo model day in the life vs other control vs objective}
+# OVerall model across outcome type
+stereo_meta2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2
+```
+
+Pairwise comparisons to compare:
+
+* pt_v_objective to pt_v_other control
+
+```{r pairwise comparisons stereo 2}
+anova(stereo_meta2, btt=2:3)
+```
+
+They do not significantly differ.
+
+### Marginal main effects
+
+```{r emmeans stereo2}
+qdrq_stereo2 <- qdrg(object = stereo_meta2, data = meta_stereo2)
+
+emmeans_stereo2 <- summary(emmeans(qdrq_stereo2, "pt_comparison"))
+emmeans_stereo2
+
+emmeans_stereo2 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "'Day in the life' control vs other comparison conditions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Vs `Day in the life` control','Vs other control',
+                              'Vs objective'))
+```
+
+The marginal main effects do not differ from 0.
+
+### Overall I2
+
+```{r overall I2 stereo 2}
+get_I2_overall(meta_stereo2, stereo_meta2)
+```
+
+Heterogeneity is high.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 stereo 2}
+get_I2_var_levels(meta_stereo2, stereo_meta2)
+```
+
+Most hetereogeneity is explained by between-study variance, followed by between-condition variance.
+
+### Post-hoc power
+
+* k = 138 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power stereo 2}
+subgroup_power(n_groups = 3, 
+               effect_sizes = c(.00, -.03, .10), 
+               sample_size = 99,
+               k = 138,
+               es_type = "d")
+```
+
+## Moderators for "day in the life" model
+
+### Scales of measurement
+
+```{r stereo 2 mod1}
+stereo_meta2_mod1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo2)
+
+stereo_meta2_mod1
+```
+
+Nothing is significant from one another, and the intercept is not significantly different from 0. Outcome scale group 5 (Essay stereotypicality) is marginally different from the intercept outcome scale group 1 (IAT). Rma.mv dropped cells with 0 due to redundancies, and therefore cannot be modeled in emmeans.
+
+#### I2 overall
+
+```{r I2 overall stereo2 mod scales}
+get_I2_overall(meta_stereo2, stereo_meta2_mod1)
+```
+
+About the same as the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stereo2 mod scales}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod1)
+```
+
+Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
+
+### Target moderator - information amount
+
+```{r stereo 2 mod2}
+stereo_meta2_mod2 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2_mod2
+```
+
+Pt v other control with medium target information is marginally different from the intercept (p vs "day  in the life" control with impoverished information). Nothing else is significant from the intercept, nor is the intercept significant.
+
+#### Marginal main effect
+
+```{r emmeans stereo2 mod2 }
+qdrq_stereo2_mod2 <- qdrg(object = stereo_meta2_mod2, data = meta_stereo2)
+
+emmeans_stereo2_mod2 <- summary(emmeans(qdrq_stereo2_mod2, "pt_comparison", "target_information"))
+emmeans_stereo2_mod2
+```
+
+None of the effect sizes significantly differ from 0 when looking at the marginal means when broken down by target information.
+
+#### I2 overall
+
+```{r I2 overall stereo2 mod2}
+get_I2_overall(meta_stereo2, stereo_meta2_mod2)
+```
+
+Slightly higher than the original model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stereo2 mod2}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod2)
+```
+
+Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
+
+### Target moderator - target out-group
+
+```{r stereo 2 mod3}
+stereo2_group_data <- meta_stereo2 %>% 
+  select(dunb, var_dunb, pt_comparison, target_out_minor, sample_number_total,
+         outcomes_within_sample_var, conditions_within_sample_var, outcome_scale_group) %>% 
+  na.omit()
+
+stereo_meta2_mod3 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*target_out_minor,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = stereo2_group_data)
+
+stereo_meta2_mod3
+```
+
+The intercept (pt v day in the life control with out-group target) is significantly different from 0. Pt v control is marginally different from the intercept, and pt v objective is significantly different from the intercept. The simple main effect of target out-group group is significant: in the "day in the life" control, there are higher positive effect sizes (less prejudice reduction) for non-out-group/minority targets than out-group/minority targets. The interactions are also significant, indicating there are differences between the differences for both pt_v_control with a non-out-group minority target and p_v_objective with a non-out-group/minority target in comparison to the intercept. The marginal main effects will show the estimates of each of these comparisons better, as well as if they differ from 0.
+
+#### Marginal main effects
+
+```{r emmeans stereo2 mod3}
+qdrq_stereo2_mod3 <- qdrg(object = stereo_meta2_mod3, data = stereo2_group_data)
+
+emmeans_stereo2_mod3 <- summary(emmeans(qdrq_stereo2_mod3, "pt_comparison", "target_out_minor"))
+emmeans_stereo2_mod3
+
+outgroup_label <- c("1" = "Outgroup/Minority", "2" = "Non-Outgroup/Minority")
+
+emmeans_stereo2_mod3 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  facet_grid(cols = vars(target_out_minor),
+             labeller = labeller(target_out_minor = outgroup_label)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "'Day in the life' control vs other comparison conditions in stereotyping only",
+       subtitle = "Lower effect sizes = more prejudice reduction (better)",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Vs `Day in the life`','Vs other control',
+                              'Vs objective'))
+```
+
+#### I2 overall
+
+```{r I2 overall stereo2 mod3}
+get_I2_overall(stereo2_group_data, stereo_meta2_mod3)
+```
+
+About the same as the model without moderaters.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere2 mod3}
+get_I2_var_levels(stereo2_group_data, stereo_meta2_mod3)
+```
+
+Most heterogeneity explained by between-studies variance, or between-conditions variance.
+
+### Sample size
+
+```{r stereo 2 mod4}
+stereo_meta2_mod4 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+
+stereo_meta2_mod4
+```
+
+Sample size does not interact with pt comparison. None of the effects are significant.
+
+#### I2 overall
+
+```{r I2 overall stereo2 mod4}
+get_I2_overall(meta_stereo2, stereo_meta2_mod4)
+```
+
+Heterogeneity is the same as in the model without moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels stere2 mod4}
+get_I2_var_levels(meta_stereo2, stereo_meta2_mod4)
+```
+
+Heterogeneity is explained by between-studies variance the most, followed almost equally by between-conditions and between-outcomes variance.

@@ -1,0 +1,353 @@
+---
+title: "Interpersonal Results"
+author: "Kathryn Denning"
+date: "1/29/2021"
+output: html_document
+---
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+#install.packages("emmeans")
+#install.packages("metapower")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(emmeans)
+library(metapower)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+options(scipen=999)
+
+# importing data
+converted_data <- import("converted_data.csv") 
+
+# Importing functions I wrote from R document in this project
+source("meta_functions.R")
+
+# data prep
+meta_data <- meta_clean_func(converted_data)
+```
+
+# Interpersonal Feelings
+
+```{r feels data prep}
+feels <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      self_v_control = c("1", "2"),
+                                      self_v_objective = c("3"),
+                                      other_v_control = c( "6"),# there are no day in the life controls in the interpersonal feels category
+                                      other_v_objective = c("7"))) %>% 
+  filter(pt_comparison == "self_v_control" | pt_comparison == "self_v_objective" | 
+           pt_comparison == "other_v_control" | pt_comparison == "other_v_objective") %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison))) %>% 
+  mutate(pt_comparison = fct_relevel(pt_comparison, 
+                                     "self_v_objective",
+                                     "self_v_control",
+                                     "other_v_objective",
+                                     "other_v_control"))
+feels %<>% 
+  filter(outcome_type == "3")
+
+```
+
+## Number of overall effects:
+
+```{r number of effect sizes feels}
+feels %>% 
+  count()
+```
+
+## Effects per comparison group:
+
+```{r effects pt feels data}
+feels %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims. I want to look at these comparisons because they speak to McAuliffe et al's meta-analytic results.
+
+### Number of unique samples
+
+```{r overlap samples}
+feels %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell overlap}
+feels %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+## Model results
+
+**Contrasts:**
+
+```{r feels pt contrasts}
+contrasts(feels$pt_comparison)
+```
+
+```{r r feels model pt}
+feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
+
+feels_model <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = feels)
+
+feels_model
+```
+
+The intercept (self vs objective) is significantly different from 0. The simple effects indicate that self v control and other v control lead to significantly lower effect sizes than self v objective. Other v objective did not differ from the intercept.
+
+### Marginal main effects
+
+```{r emmeans feels breakdown}
+qdrq_feels1 <- qdrg(object = feels_model, data = feels)
+
+emmeans_feels1 <- summary(emmeans(qdrq_feels1, "pt_comparison"))
+emmeans_feels1
+
+emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Imagine-self vs other & objective vs control instructions in interpersonal only",
+       subtitle = "higher effect sizes = better outcome",
+       x = "Perpsective taking comparison",
+       y = "Average effect size (d unbiased)") +
+  scale_x_discrete(labels = c('Self vs Objective','Self vs Control',
+                              'Other vs Objective', 'Other vs Control'))
+```
+
+The marginal main effects indicate that all effect sizes except self v control significantly differ from 0. However, both self and other vs objective have medium to large effect sizes, and other v control has a small effect size.
+
+### Overall I2 for model
+
+```{r overall I2 feels}
+get_I2_overall(feels, feels_model)
+```
+
+High heterogeneity.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 feels}
+get_I2_var_levels(feels, feels_model)
+```
+
+Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
+
+### Post-hoc power
+
+* k = 184 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power feels}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(.51, .26, .55, .29), 
+               sample_size = 124,
+               k = 184,
+               es_type = "d")
+```
+
+## Moderators
+
+### Scales of measurement
+
+```{r feels model scales mod}
+feels %>% 
+  group_by(outcome_scale_group) %>% 
+  count()
+
+feels_mod <- feels %>% 
+  filter(outcome_scale_group != 16) %>% 
+  unique() #removing this level since there is only one study in it
+
+feels_mod$outcome_scale_group <- droplevels(feels_mod$outcome_scale_group)
+
+#model with interaction
+feels_model_mod1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = feels_mod)
+
+feels_model_mod1
+```
+
+Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons that have 0 studies per cell. There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). 
+
+#### I2 overall
+
+```{r I2 overall scales}
+get_I2_overall(feels_mod, feels_model_mod1)
+```
+
+Scale of measurement only lowered the I2 by 2%. 
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 var levels scale mods}
+get_I2_var_levels(feels_mod, feels_model_mod1)
+```
+
+Most heterogeneity is explained by between-study variance, followed by between-outcomes variance.
+
+### Target - amount of information
+
+```{r feels targ info mod}
+feels_model_mod2 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod2
+```
+
+None are significant. Emmeans won't work because redundant predictors were dropped from ram.mv model.
+
+#### I2 overall
+
+```{r I2 overall feels targ info}
+get_I2_overall(feels_mod, feels_model_mod2)
+```
+
+High heterogeneity - moderator did not help.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels feels targ info}
+get_I2_var_levels(feels_mod, feels_model_mod2)
+```
+
+Most variance explained by between-study variance, with almost 12% explained by scales of measurement.
+
+### Target - In need/In distress target grouping (relevant to outcome category)
+
+```{r feels targ need mod}
+feels_model_mod3 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_emapthetic_need,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod3
+```
+
+The intercept is significantly different from 0. The difference between other v control and intercept is marginal. There are no interactions.
+
+#### Marginal main effects
+
+```{r emmeans feels empathetic need targ mod}
+qdrq_feels3 <- qdrg(object = feels_model_mod3, data = feels_mod)
+
+emmeans_feels3 <- summary(emmeans(qdrq_feels3, "pt_comparison", "target_emapthetic_need"))
+emmeans_feels3
+```
+
+Self and other vs objective still are different from 0 when the target is empathetic. Self and other vs control are not different from 0 when the target is empathetic. When the target is not empathetic, the only condition that does not differ from 0 is self vs control.
+
+#### I2 overall
+
+```{r feels need targ I2 overall}
+get_I2_overall(feels_mod, feels_model_mod3)
+```
+
+High heterogeneity
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r feels need targ I2 levels}
+get_I2_var_levels(feels_mod, feels_model_mod3)
+```
+
+Most heterogeneity explained by between-studies variance, with over 13% by scales of measurement.
+
+### Sample size
+
+```{r sample size mod feels}
+feels_model_mod4 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels_mod)
+
+feels_model_mod4
+````
+
+Intercept different from 0. No interaction with sample size.
+
+#### I2 overall
+
+```{r n feels I2 overall}
+get_I2_overall(feels_mod, feels_model_mod4)
+```
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r n feels I2 var levels}
+get_I2_var_levels(feels_mod, feels_model_mod4)
+```

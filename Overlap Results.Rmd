@@ -1,0 +1,408 @@
+---
+title: "Overlap Results"
+author: "Kathryn Denning"
+date: "1/29/2021"
+output: html_document
+---
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+# Cleaning
+## import data
+
+#install.packages("rio")
+#install.packages("here")
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("janitor")
+#install.packages("lme4")
+#install.packages("emmeans")
+#install.packages("metafor")
+#install.packages("Cairo")
+#install.packages("tinytex")
+#install.packages("compute.es")
+#install.packages("multcomp")
+#install.packages("car")
+#install.packages("emmeans")
+#install.packages("metapower")
+library(rio)
+library(here)
+library(magrittr)
+library(janitor)
+library(lme4)
+library(emmeans)
+library(Cairo)
+library(tinytex)
+library(metafor)
+library(compute.es)
+library(multcomp)
+library(car)
+library(tidyverse)
+library(emmeans)
+library(metapower)
+
+# Setting global chunk options
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Windows messes up my plots, these lines of code make them clearer
+knitr::opts_knit$set(dev.args = list(type = "cairo"))
+
+trace(grDevices:::png, quote({
+  if (missing(type) && missing(antialias)) {
+    type <- "cairo-png"
+    antialias <- "subpixel"
+  }
+}), print = FALSE)
+
+options(scipen=999)
+
+# importing data
+converted_data <- import("converted_data.csv") 
+
+# Importing functions I wrote from R document in this project
+source("meta_functions.R")
+
+# data prep
+meta_data <- meta_clean_func(converted_data)
+```
+
+# Overlap
+
+```{r overlap meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+#collapsing across conditions for data-prep
+overlap_data <- meta_data %>% 
+  mutate(pt_comparison = fct_collapse(pt_comparison, 
+                                      pt_v_control = c("1", "2", "5", "6"),
+                                      pt_v_objective = c("3", "7"))) %>% 
+  filter(pt_comparison == "pt_v_control" | pt_comparison == "pt_v_objective") %>% 
+  mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping")) %>% 
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+
+overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
+                                     "pt_v_control")) %>% 
+  filter(outcome_type == "Overlap")
+```
+
+## Number of overall effects:
+
+```{r effects overlap data}
+overlap_data %>% 
+  count()
+```
+
+## Effects per comparison group:
+
+```{r effects pt overlap data}
+overlap_data %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+### Number of unique samples
+
+```{r overlap samples}
+overlap_data %>% 
+  dplyr::select(sample_number_total) %>% 
+  unique() %>% 
+  count()
+```
+
+### Average sample size per cell
+
+**To be used in power analysis**
+
+```{n per cell overlap}
+overlap_data %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+## Results
+
+*Note: this comparison is the same as in the overall model interacting with outcome types, as the small k per cell in the overlap/merging category was the reason we had to collapse cross other perspective taking comparisons in that overall model.*
+
+**Contrasts:**
+
+```{r overlap contrasts}
+contrasts(overlap_data$pt_comparison)
+```
+
+```{r overlap model pt}
+overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
+levels(overlap_data$outcome_scale_group)
+
+overlap_pt <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt
+```
+
+The intercept is marginally different from zero. The pt v control condition does not differ significantly from the intercept.
+
+### Marginal main effect
+
+```{r emmeans overlap}
+qdrq_overlap <- qdrg(object = overlap_pt, data = overlap_data)
+
+emmeans_overlap <- summary(emmeans(qdrq_overlap, "pt_comparison"))
+emmeans_overlap 
+```
+
+This comparison is the same as the overall model. Without the interaction, the values change slightly, but the pattern and significance do not.
+
+### I2 overall model
+
+```{r I2 overall overlap}
+get_I2_overall(overlap_data, overlap_pt)
+```
+
+This heterogeneity is still high, but lower than with the stereotyping outcome or the overall model with perspective taking interacting with outcome type.
+
+### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels overlap}
+get_I2_var_levels(overlap_data, overlap_pt)
+```
+
+Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed structure.
+
+### Post-hoc power
+
+* k = 48 is the number of effect sizes
+* Sample size is the average found earlier to the nearest number the r function would take
+* The effect sizes are from the marginal effect size outcomes
+
+```{r power overlap}
+subgroup_power(n_groups = 2, 
+               effect_sizes = c(.40, .33), 
+               sample_size = 132,
+               k = 48,
+               es_type = "d")
+```
+
+## Moderators
+
+### Scale of measurement
+
+```{r overlap model scales mod}
+overlap_data %>% 
+  group_by(outcome_scale_group) %>% 
+  count()
+
+overlap_model_mod1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = overlap_data)
+
+overlap_model_mod1
+```
+
+Scale 7 (Self-report IOS merging/scales) while in the pt vs objective comparison is the reference group. These are simple effects in which the effect sizes become significantly lower for the pt vs objective comparison when merging is measured from overlap of traits/attributes or measures of social distancing. There are no interactions. 
+
+#### Marginal main effects
+
+```{r emmeans overlap scale}
+qdrq_overlap2 <- qdrg(object = overlap_model_mod1, data = overlap_data)
+
+emmeans_overlap2 <- summary(emmeans(qdrq_overlap2, "pt_comparison", "outcome_scale_group"))
+emmeans_overlap2
+```
+
+When using a self-reported merging scale both pt vs objective and control lead to medium to large effect sizes that differed from 0. When using both the attribution and social distance scales, neither comparison significantly differed from 0.
+
+#### I2 overall
+
+```{r I2 overall overlap scale}
+get_I2_overall(overlap_data, overlap_model_mod1)
+```
+
+With this moderator, the heterogeneity lessens a bit.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels overlap scale}
+get_I2_var_levels(overlap_data, overlap_model_mod1)
+```
+
+Almost all of the heterogeneity can be explained by between-studies variance.
+
+### Target - amount of information
+
+```{r}
+overlap_model_mod2 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
+
+overlap_model_mod2
+```
+
+None are significant. I2 lowered.
+
+#### Marginal main effects
+
+```{r emmeans overlap targ info mod}
+qdrq_overlap3 <- qdrg(object = overlap_model_mod2, data = overlap_data)
+
+emmeans_overlap3 <- summary(emmeans(qdrq_overlap3, "pt_comparison", "target_information"))
+emmeans_overlap3
+```
+
+When target information is impoverished, tneither comparison significantly differs from 0. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a medium to large effect size. 
+
+#### Overall I2
+
+```{r overall I2 overlap targ info}
+get_I2_overall(overlap_data, overlap_model_mod2)
+```
+
+Heterogeneity is even lower when including target information in the model.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r levels I2 overlap targ info}
+get_I2_var_levels(overlap_data, overlap_model_mod2)
+```
+
+Most of this heterogeneity is attributed to between-studies variance, with variance due to scales of measurement (17%) and then between-outcomes attributing to similar amounts (13%).
+
+With there being no redundancies in the model and lower I2, I wonder if we can model an interaction with scale?
+
+### Both scale & target info
+
+```{r}
+#Modeled target information as a main effect since it had no interactions and, because, when I tried to model it with interactions it led to redundancies
+
+overlap_data %>% 
+  group_by(pt_comparison, outcome_scale_group, target_information) %>% 
+  count() 
+
+2*3*3
+
+#Should be 18 but there are 13, so the redundancies come from the fact that there are cells with 0 in it, which rma.mv is dropping: https://stats.stackexchange.com/questions/223918/multilevel-metaregression-in-r-redundant-predictors-dropped-metafor
+
+overlap_model_mod3 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*outcome_scale_group*target_information,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      data = overlap_data)
+
+overlap_model_mod3
+```
+
+The I2 decreases having all three predictors in the model, though it is concerning that some cells are 0 and that was causing redundancies. Cannot model with emmeans because of redundancies.
+
+#### I2 overall
+
+```{r I2 overall scale and targ mod}
+get_I2_overall(overlap_data, overlap_model_mod3)
+```
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r I2 levels scale and targ mod}
+get_I2_var_levels(overlap_data, overlap_model_mod3)
+```
+
+All variance is explained by between-studies variance. This is probably due to k being too small per cell.
+
+### Target - In-group target grouping (relevant to outcome category)
+
+```{r}
+overlap_data <- overlap_data %>% 
+  filter(target_ingroup_nonspecific == "1" | target_ingroup_nonspecific == "2")
+
+overlap_data$target_ingroup_nonspecific <- droplevels(overlap_data$target_ingroup_nonspecific)
+
+overlap_model_mod4 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*target_ingroup_nonspecific,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
+
+overlap_model_mod4
+```
+
+The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept. Tried running an out-group moderator model as well, but it had a convergence issue.
+
+
+```{r emmeans overlap in-group targ mod}
+qdrq_overlap4 <- qdrg(object = overlap_model_mod4, data = overlap_data)
+
+emmeans_overlap4 <- summary(emmeans(qdrq_overlap4, "pt_comparison", "target_ingroup_nonspecific"))
+emmeans_overlap4
+```
+
+The marginal main effects indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-significant and are about the same regardless of if pt is being compared to the objective (.31) or control condition (.34). Both are lower than the in-group effect sizes.
+
+#### I2 overall
+
+```{r overlap targ group mod I2 overall}
+get_I2_overall(overlap_data, overlap_model_mod4)
+```
+
+Heterogeneity is not as low as other moderators.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r overlap targ group mod I2 var levels}
+get_I2_var_levels(overlap_data, overlap_model_mod4)
+```
+
+Most heterogeneity is explained by between-studies variance, followed by between-outcomes variance.
+
+### Sample size
+
+```{r sample size mod overlap}
+overlap_model_mod5 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison*n_overall,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
+
+overlap_model_mod5
+```
+
+Intercept different from 0. No interaction with sample size.
+
+#### I2 overall
+
+```{r overlap n mod I2 overall}
+get_I2_overall(overlap_data, overlap_model_mod5)
+```
+
+Overall I2 is higher with this moderator.
+
+#### I2 for levels of variance
+
+*Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
+
+```{r overlap n mod I2 var level}
+get_I2_var_levels(overlap_data, overlap_model_mod5)
+```
+
+Most heterogeneity is explained by between-studies variance. 
