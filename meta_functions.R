@@ -1,3 +1,7 @@
+###############################
+###  Functions to get I2  ####
+###############################
+
 # Instructions to hand calculate I2 are here https://www.metafor-project.org/doku.php/tips:i2_multilevel_multivariate
 #Function to get I2
 get_I2_overall <- function(.x, .y) { #.x is the dataset supplied to the rma.mv function, .y is the output of that function
@@ -95,6 +99,55 @@ filtered_meta <- function(x, y, z){ #x is the overall dataset, y is the first se
                                         ~ 1 | outcome_scale_group),
                          data = .x)))
 }
+
+
+###############################
+### Function to clean data ####
+###############################
+
+meta_clean_func <- function(converted_data){
+  converted_data %>%  
+    mutate(cohens_d = as.numeric(cohens_d),
+           reverse = as.factor(reverse)) %>% 
+    mutate(coded_cohens_d_var = (((n_pt + n_comparison)/(n_pt*n_comparison)) + ((cohens_d^2)/(2*(n_pt+n_comparison))))) %>% #calculated variance by hand for the d's we extracted from articles directly; the ones we converted also came with var calculations
+    pivot_longer(c(cohens_d, d.x, d.y, yi, d_values)) %>% #  Wrangling all converted d's into one column
+    mutate(d = value) %>% 
+    filter(!is.na(d)) %>% 
+    dplyr::select(-c(name, value)) %>% 
+    pivot_longer(c(coded_cohens_d_var, var_d.x, var_d.y, vi, d_values_var)) %>% #wrangling all variances into one column
+    mutate(var = value) %>% 
+    filter(!is.na(var)) %>% 
+    dplyr::select(-c(name, value)) %>% 
+    mutate(df = (n_pt + n_comparison - 2), #getting degrees of freedom
+           J = 1- (3/((4*df)-1)), #calculating hedges correction factor for d unbiased
+           dunb = J*d, #d unbiased
+           var_dunb = ((J^2)*var),  #variance for d unbiased
+           lowCI_dunb = dunb-1.96*sqrt(var_dunb), #getting 95% CI's for d unbiased
+           upCI_dunb  = dunb+1.96*sqrt(var_dunb)) %>% 
+    mutate(dunb = ifelse(reverse == "yes", 
+                         dunb*-1,
+                         ifelse(reverse == "no",
+                                dunb*1, NA))) %>% #reverse scored dunb that needed to be 
+    dplyr::select(-c(DOI, Notes, outcome_description_from_coding, target_long_description,
+                     weird_sample, F_score, t_score, effect_size_type,
+                     effect_direction, p_value, mean_pt, sd_pt, se_pt, 
+                     mean_comparison, sd_comparison,se_comparison, 
+                     `Note about directionality of cohen's d`)) %>% 
+    mutate(sample_number_total = as.factor(sample_number_total),
+           pt_comparison = as.factor(pt_comparison),
+           outcome_type = as.factor(outcome_type),
+           target_ingroup_nonspecific = as.factor(target_ingroup_nonspecific),
+           outcome_scale_group = as.factor(outcome_scale_group),
+           target_out_minor = as.factor(target_out_minor),
+           target_adversary = as.factor(target_adversary),
+           target_emapthetic_need = as.factor(target_empathetic_need),
+           between_within = as.factor(between_within),
+           target_information = as.factor(target_information))
+}
+
+################################
+### Extract output from RMA ####
+################################
 
 # Functions to extract values from rma.mv output; needed to help when cleaning my nested output
 get_pval_rma <- function(x){
