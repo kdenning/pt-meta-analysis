@@ -140,8 +140,8 @@ feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = feels)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = feels)
 
 feels_model
 ```
@@ -220,7 +220,7 @@ feels_mod$outcome_scale_group <- droplevels(feels_mod$outcome_scale_group)
 feels_model_mod1 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), 
                       data = feels_mod)
 
 feels_model_mod1
@@ -252,14 +252,14 @@ Most heterogeneity is explained by between-study variance, followed by between-o
 feels_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), 
                       data = feels_mod)
 
 feels_model_mod2
 ```
 
-None are significant. Emmeans won't work because redundant predictors were dropped from ram.mv model.
+None are significant. Emmeans won't work because redundant predictors were dropped from rma.mv model.
 
 #### I2 overall
 
@@ -285,8 +285,8 @@ Most variance explained by between-study variance, with almost 12% explained by 
 feels_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_emapthetic_need,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), 
                       data = feels_mod)
 
 feels_model_mod3
@@ -329,8 +329,8 @@ Most heterogeneity explained by between-studies variance, with over 13% by scale
 feels_model_mod4 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), 
                       data = feels_mod)
 
 feels_model_mod4

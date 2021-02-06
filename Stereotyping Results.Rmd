@@ -149,8 +149,8 @@ contrasts(meta_stereo1$pt_comparison)
 stereo_meta1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
 
 stereo_meta1
 ```
@@ -194,7 +194,7 @@ Again, very high.
 get_I2_var_levels(meta_stereo1, stereo_meta1)
 ```
 
-Most of the heterogeneity is explained by between-studies variance, with about 16% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
+Most of the heterogeneity is explained by between-studies variance, with about 12% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
 
 ### Post-hoc power
 
@@ -228,7 +228,7 @@ meta_stereo1_mod1_dat <- meta_stereo1 %>%
 stereo_meta1_mod1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo1_mod1_dat)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = meta_stereo1_mod1_dat)
 
 stereo_meta1_mod1
 
@@ -260,8 +260,8 @@ Without the crossed variance structure (because it is a moderator), more of that
 stereo_meta1_mod2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
 
 stereo_meta1_mod2
 ```
@@ -306,8 +306,8 @@ stereo1_group_data <- meta_stereo1 %>%
 stereo_meta1_mod3 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_out_minor,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = stereo1_group_data)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = stereo1_group_data)
 
 stereo_meta1_mod3
 ```
@@ -347,8 +347,8 @@ Most of the variance is explained by between-studies or between-conditions (with
 stereo_meta1_mod4 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
 
 stereo_meta1_mod4
 ```
@@ -386,8 +386,8 @@ contrasts(meta_stereo2$pt_comparison)
 stereo_meta2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var, 
-                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
 
 stereo_meta2
 ```
@@ -463,7 +463,7 @@ subgroup_power(n_groups = 3,
 stereo_meta2_mod1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = meta_stereo2)
 
 stereo_meta2_mod1
 ```
@@ -494,8 +494,8 @@ Most hetereogeneity is explained by between-studies variance, followed by betwee
 stereo_meta2_mod2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
 
 stereo_meta2_mod2
 ```
@@ -542,8 +542,8 @@ stereo2_group_data <- meta_stereo2 %>%
 stereo_meta2_mod3 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_out_minor,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = stereo2_group_data)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = stereo2_group_data)
 
 stereo_meta2_mod3
 ```
@@ -597,8 +597,8 @@ Most heterogeneity explained by between-studies variance, or between-conditions 
 stereo_meta2_mod4 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var,
-                                    ~ 1 | outcome_scale_group), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
 
 stereo_meta2_mod4
 ```
