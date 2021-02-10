@@ -296,8 +296,11 @@ The interpersonal feelings outcome results are consistent with McAuliffe's findi
 For the categories other than Interpersonal Feels, none of the other comparisons are statistically different from 0. Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
 ```{r check if model is over parametized}
+# Checking if model is over-parametized
+# code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
 profile(meta_multi2)
+# Looks fine
 ```
 
 ### I2 overall
@@ -313,7 +316,7 @@ Overall heterogeneity is very high. 91.13% of the variance can be explained due 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r levels I2 multi}
-get_I2_var_levels(meta_overall1, meta_multi2)
+get_I2_levels(meta_multi2)
 ```
 
 Most of this heterogeneity is explained by between-study variance, followed by between-outcome (within-study) variance. 

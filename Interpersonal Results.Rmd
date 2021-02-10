@@ -191,7 +191,7 @@ High heterogeneity.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r levels I2 feels}
-get_I2_var_levels(feels, feels_model)
+get_I2_levels(feels_model)
 ```
 
 Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
@@ -250,7 +250,7 @@ Scale of measurement only lowered the I2 by 2%.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels scale mods}
-get_I2_var_levels(feels_mod, feels_model_mod1)
+get_I2_levels(feels_model_mod1)
 ```
 
 Most heterogeneity is explained by between-study variance, followed by between-outcomes variance.
@@ -283,7 +283,7 @@ High heterogeneity - moderator did not help.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 levels feels targ info}
-get_I2_var_levels(feels_mod, feels_model_mod2)
+get_I2_levels(feels_model_mod2)
 ```
 
 Most variance explained by between-study variance, with almost 12% explained by scales of measurement.
@@ -327,7 +327,7 @@ High heterogeneity
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r feels need targ I2 levels}
-get_I2_var_levels(feels_mod, feels_model_mod3)
+get_I2_levels(feels_model_mod3)
 ```
 
 Most heterogeneity explained by between-studies variance, with over 13% by scales of measurement.
@@ -358,5 +358,5 @@ get_I2_overall(feels_mod, feels_model_mod4)
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r n feels I2 var levels}
-get_I2_var_levels(feels_mod, feels_model_mod4)
+get_I2_levels(feels_model_mod4)
 ```

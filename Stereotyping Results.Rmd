@@ -206,7 +206,7 @@ Again, very high.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r levels I2 stereo 1}
-get_I2_var_levels(meta_stereo1, stereo_meta1)
+get_I2_levels(stereo_meta1)
 ```
 
 Most of the heterogeneity is explained by between-studies variance, with about 12% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
@@ -305,7 +305,7 @@ Compared to the original stereotyping model this is moderator, the overall heter
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stere1 mod2}
-get_I2_var_levels(meta_stereo1, stereo_meta1_mod2)
+get_I2_levels(stereo_meta1_mod2)
 ```
 
 Most of the variance is between-studies, with a somewhat significant amount explained by between-outcome (within-study) variance.
@@ -351,7 +351,7 @@ About the same as the original model without moderators.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stere1 mod3}
-get_I2_var_levels(stereo1_group_data, stereo_meta1_mod3)
+get_I2_levels(stereo_meta1_mod3)
 ```
 
 Most of the variance is explained by between-studies or between-conditions (within-study) variance. Interestingly, there is 0% variance explained by between-outcomes variance.
@@ -383,7 +383,7 @@ Heterogeneity is about the same as the model without moderators.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stere1 mod4}
-get_I2_var_levels(meta_stereo1, stereo_meta1_mod4)
+get_I2_levels(stereo_meta1_mod4)
 ```
 
 Most variance is explained by between-studies variance, followed by between-outcomes (within-study) variance.
@@ -451,7 +451,7 @@ Heterogeneity is high.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r levels I2 stereo 2}
-get_I2_var_levels(meta_stereo2, stereo_meta2)
+get_I2_levels(stereo_meta2)
 ```
 
 Most hetereogeneity is explained by between-study variance, followed by between-condition variance.
@@ -498,7 +498,7 @@ About the same as the model without moderators.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stereo2 mod scales}
-get_I2_var_levels(meta_stereo2, stereo_meta2_mod1)
+get_I2_levels(stereo_meta2_mod1)
 ```
 
 Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
@@ -541,7 +541,7 @@ Slightly higher than the original model without moderators.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stereo2 mod2}
-get_I2_var_levels(meta_stereo2, stereo_meta2_mod2)
+get_I2_levels(stereo_meta2_mod2)
 ```
 
 Most hetereogeneity is explained by between-studies variance, followed by between-outcomes (within-study) variance.
@@ -601,7 +601,7 @@ About the same as the model without moderaters.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stere2 mod3}
-get_I2_var_levels(stereo2_group_data, stereo_meta2_mod3)
+get_I2_levels(stereo_meta2_mod3)
 ```
 
 Most heterogeneity explained by between-studies variance, or between-conditions variance.
@@ -633,7 +633,7 @@ Heterogeneity is the same as in the model without moderators.
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 var levels stere2 mod4}
-get_I2_var_levels(meta_stereo2, stereo_meta2_mod4)
+get_I2_levels(stereo_meta2_mod4)
 ```
 
 Heterogeneity is explained by between-studies variance the most, followed almost equally by between-conditions and between-outcomes variance.

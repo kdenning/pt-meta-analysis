@@ -37,6 +37,17 @@ get_I2_var_levels <- function(.x, .y) { #.x is the dataset supplied to the rma.m
   return(I2)
 }
 
+# Less code for the same results as above and suggestion by the same person - the creator of metafor
+## https://stats.stackexchange.com/questions/187197/computing-heterogeneity-assigned-to-random-factors-in-meta-analysis
+
+get_I2_levels <- function(model){
+  wi <- 1/model$vi
+  k <- length(wi)
+  s2m <- (k-1)*sum(wi)/(sum(wi)^2 - sum(wi^2))
+  s2t <- s2m + sum(model$sigma2)
+  round((model$sigma2 / s2t)*100, digits = 2)
+}
+
 # Get column for between study hetereogeneity to put in table
 get_btw_study_I2 <- function(x){#x is output from function that gets I2 var levels per study
   between_study_I2 <- list(length = length(x))

@@ -155,6 +155,7 @@ The intercept is marginally different from zero. The pt v control condition does
 # code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
 profile(overlap_pt)
+#Looks fine
 ```
 
 ### Marginal main effect
@@ -181,7 +182,7 @@ This heterogeneity is still high, but lower than with the stereotyping outcome o
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
 ```{r I2 levels overlap}
-get_I2_var_levels(overlap_data, overlap_pt)
+get_I2_levels(overlap_pt)
 ```
 
 Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed structure.
