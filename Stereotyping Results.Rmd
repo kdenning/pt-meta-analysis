@@ -3,6 +3,8 @@ title: "Stereotyping"
 author: "Kathryn Denning"
 date: "1/29/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 
@@ -150,7 +152,7 @@ stereo_meta1 <- rma.mv(dunb,
                       var_dunb, 
                       mods = ~ pt_comparison,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
+                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
 
 stereo_meta1
 ```
@@ -177,6 +179,19 @@ emmeans_stereo1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
 ```
 
 None of the marginal main effects differ from zero. There is an interesting pattern in that self or other vs objective lead to higher effect sizes (less stereotype prejudice reduction). However, with nothing differing from zero, this does not mean anything statistically.
+
+### Checking if model is over-parametized
+
+```{r check if model is over parametized, include = FALSE}
+# Checking if model is over-parametized
+# code is very slow, so will not include in markdown
+par(mfrow=c(2,2))
+profile(stereo_meta1)
+
+# This model is slightly over-parametized, as demonstrated by the single missing value in the plot for sigma 4. This missing value indicates the model did not converge at this location. Previously, when the structure of the MLM meta-analysis included modeling effect-size nested twice within both crossed structures, there were significant flat portions for the plots of sigma 4 and what would have been sigma 6 (effect size nested within outcome_scale_group). That model was more overparametized. We may want to consider collapsing across our within-study variance variables to see if that helps with overparametization, or decide to remove the one that accounts for little (or possibly no) variance
+
+# http://www.metafor-project.org/doku.php/analyses:konstantopoulos2011#a_common_mistake_in_the_three-level_model
+```
 
 ### I2 overall
 

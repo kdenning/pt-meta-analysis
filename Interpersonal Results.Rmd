@@ -3,6 +3,8 @@ title: "Interpersonal Results"
 author: "Kathryn Denning"
 date: "1/29/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 ```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 # Cleaning
@@ -141,7 +143,7 @@ feels_model <- rma.mv(dunb,
                       var_dunb,
                       mods = ~ pt_comparison,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = feels)
+                                    ~ 1 | outcome_scale_group), data = feels)
 
 feels_model
 ```
@@ -168,6 +170,13 @@ emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
 ```
 
 The marginal main effects indicate that all effect sizes except self v control significantly differ from 0. However, both self and other vs objective have medium to large effect sizes, and other v control has a small effect size.
+
+```{r check if model is over parametized, include = FALSE}
+# Checking if model is over-parametized
+# code is very slow, so will not include in markdown
+par(mfrow=c(2,2))
+profile(feels_model)
+```
 
 ### Overall I2 for model
 

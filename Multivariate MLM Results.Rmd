@@ -253,7 +253,7 @@ meta_multi2 <- rma.mv(dunb,
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_type,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_overall1)
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
 
 meta_multi2
 ```
@@ -294,6 +294,11 @@ emmeans_multi %>% ggplot(aes(x = pt_comparison, y = emmean)) +
 The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .53). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control (.28), but again, we have more results included. We also obtained our results in the interactive MLM model, not individual meta-analysis models as McAuliffe et al did. MLM models employ shrinkage on the estimates that would not occur when subsetting data down to the individual comparisons, which also accounts for differences between our results and McAuliffe results. This also allows us to retain a larger k.
 
 For the categories other than Interpersonal Feels, none of the other comparisons are statistically different from 0. Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
+
+```{r check if model is over parametized}
+par(mfrow=c(2,2))
+profile(meta_multi2)
+```
 
 ### I2 overall
 
