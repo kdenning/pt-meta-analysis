@@ -65,6 +65,7 @@ converted_data <- import("converted_data.csv")
 source("functions/meta_functions.R")
 
 # data prep
+## Using function I wrote to clean data
 meta_data <- meta_clean_func(converted_data)
 ```
 
@@ -142,7 +143,7 @@ feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                      random = list(~ effect_size_num | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
                                     ~ 1 | outcome_scale_group), data = feels)
 
 feels_model
@@ -262,7 +263,7 @@ feels_model_mod2 <- rma.mv(dunb,
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                                    ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
 feels_model_mod2
@@ -295,7 +296,7 @@ feels_model_mod3 <- rma.mv(dunb,
                       var_dunb,
                       mods = ~ pt_comparison*target_emapthetic_need,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                                    ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
 feels_model_mod3
@@ -339,7 +340,7 @@ feels_model_mod4 <- rma.mv(dunb,
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
                       random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                                    ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
 feels_model_mod4

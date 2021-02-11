@@ -67,6 +67,7 @@ converted_data <- import("converted_data.csv")
 source("functions/meta_functions.R")
 
 # data prep
+## Using function I wrote to clean data
 meta_data <- meta_clean_func(converted_data)
 ```
 

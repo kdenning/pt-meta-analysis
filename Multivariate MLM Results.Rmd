@@ -69,11 +69,8 @@ converted_data <- import("converted_data.csv")
 # Importing functions I wrote from R document in this project
 source("functions/meta_functions.R")
 
-# Importing function from meta-showdown for WAAP
-source("meta-showdown/MA-methods/6-WAAP.R")
-source("meta-showdown/MA-methods/3-PET-PEESE.R")
-
 # data prep
+## Using function I wrote to clean data
 meta_data <- meta_clean_func(converted_data)
 ```
 
