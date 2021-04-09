@@ -35,7 +35,7 @@ library(compute.es)
 library(multcomp)
 library(car)
 library(tidyverse)
-library(dmetar)
+#library(dmetar)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
