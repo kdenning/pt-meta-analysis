@@ -1,17 +1,18 @@
 ---
 title: "Multivariate Results"
-author: "Kathryn Denning"
-date: "1/14/2021"
 output: 
-  html_document:
-    code_folding: "hide"
-    toc: true
-    toc_float: true
+    html_document:
+      code_download: TRUE
+      toc: TRUE
+      toc_float:
+        collapsed: FALSE
+      toc_depth: 1
+      code_folding: hide
 editor_options: 
   chunk_output_type: console
 ---
 
-```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, include = FALSE}
 # Cleaning
 ## import data
 
@@ -45,6 +46,7 @@ library(car)
 library(tidyverse)
 library(emmeans)
 library(metapower)
+library(weightr)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -74,7 +76,7 @@ source("functions/meta_functions.R")
 meta_data <- meta_clean_func(converted_data)
 ```
 
-# Checking if conditions need collapsed
+# Checking if conditions need collapsed {.tabset .tabset-fade .tabset-pills}
 
 ## Stereotyping outcome
 
@@ -132,7 +134,7 @@ k_per_comparison %>%
 
 We will have to collapse across across "day in the life" and "other" control conditions. As our "Self PT versus Objective" is only one study under our pre-registered limit - and this is a preliminary analysis for a doctoral requirement - we will include that category for this analysis with the expectation that when we include regression coefficients and data from contacted authors, it will be over our limit (spoiler alert: it will). Therefore, for the analysis specifically examining interpersonal feelings outcomes, we will not collapse across Imagine-self and Imagine-other instruction comparisons. 
 
-# Overall Multivariate Meta-analysis
+# Overall Multivariate Meta-analysis {.tabset .tabset-fade .tabset-pills}
 
 ```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
@@ -205,7 +207,7 @@ meta_overall1 %>%
 
 **To be used in power analysis**
 
-```{n per cell multi}
+```{r n per cell multi}
 meta_overall1 %>% 
   dplyr::select(n_pt, n_comparison) %>% 
   unique() %>% 
@@ -244,6 +246,8 @@ meta_overall1 %>%
 ```{r multi contrasts}
 contrasts(meta_overall1$outcome_type)
 ```
+
+**Results:**
 
 ```{r overall meta interaction mod}
 meta_multi2 <- rma.mv(dunb, 
@@ -292,13 +296,15 @@ The interpersonal feelings outcome results are consistent with McAuliffe's findi
 
 For the categories other than Interpersonal Feels, none of the other comparisons are statistically different from 0. Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
-```{r check if model is over parametized}
+```{r check if model is over parametized, eval = FALSE}
 # Checking if model is over-parametized
 # code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
 profile(meta_multi2)
 # Looks fine
 ```
+
+## Heterogeneity
 
 ### I2 overall
 
@@ -318,7 +324,7 @@ get_I2_levels(meta_multi2)
 
 Most of this heterogeneity is explained by between-study variance, followed by between-outcome (within-study) variance. 
 
-### Post-hoc Power
+## Post-hoc Power
 
 * The effect sizes are obtained from the marginal means for each of the cells
 * Sample size is the average found earlier (n = 59) to the nearest number the r function would take
@@ -332,13 +338,13 @@ subgroup_power(n_groups = 6,
                es_type = "d")
 ```
 
-# Publication Bias
+# Publication Bias {.tabset .tabset-fade .tabset-pills}
 
 ## Histograms of p-values
 
 ### Any outcome category
 
-```{r}
+```{r overall p hist}
 p_val_data <- converted_data %>% 
   select(authors, Year, study_num_total, study_num_per_article, 
          sample_number_total, p_value, pt_comparison, interpersonl_subcategory) %>% 
@@ -361,16 +367,44 @@ hist(p_val_data$p_value,
      xlim = c(0, 1.0),
      breaks = 100)
 abline(v = .05, col="red", lwd=1, lty=1)
+```
 
-p_val_data %>% 
+**Table of p-values:**
+
+```{r overall p table}
+p_val_table <- p_val_data %>% 
   select(p_val_cat) %>% 
   group_by(p_val_cat) %>% 
-  count()
+  count() %>% 
+  mutate(p_val_cat = as.factor(p_val_cat)) 
+p_val_table
+```
+
+**Percent of non-sig. p-values:**
+
+```{r no sig overall p}
+total_pvals <- sum(p_val_table$n)
+nonsig_pvals_table <- p_val_table %>% 
+  filter(p_val_cat != "<=.01" & 
+           p_val_cat != ">.01 - <=.02" &
+           p_val_cat !=">.02 - <=.05") 
+nonsig_pvals <- sum(nonsig_pvals_table$n)
+
+# Amount of p-values that are not significant
+nonsig_percent <- nonsig_pvals/total_pvals*100
+nonsig_percent
+```
+
+**Percent of sig. p-values:**
+
+```{r sig overall p}
+# Amount of p-values that are significant
+100 - nonsig_percent
 ```
 
 ### Stereotyping
 
-```{r}
+```{r stereo p val hist}
 stereo_p_val_data <- p_val_data %>% 
   filter(interpersonl_subcategory == 1)
 
@@ -380,16 +414,44 @@ hist(stereo_p_val_data$p_value,
      xlim = c(0, 1.0),
      breaks = 100)
 abline(v = .05, col="red", lwd=1, lty=1)
+```
 
-stereo_p_val_data %>% 
+**Table of p-values:**
+
+```{r stereo p val table}
+p_val_table_stereo <- stereo_p_val_data %>% 
   select(p_val_cat) %>% 
   group_by(p_val_cat) %>% 
-  count()
+  count() %>% 
+  mutate(p_val_cat = as.factor(p_val_cat)) 
+p_val_table_stereo
+```
+
+**Percent of non-sig. p-values:**
+
+```{r stereo p vals non sig}
+stereo_total_pvals <- sum(p_val_table_stereo$n)
+stereo_nonsig_pvals_table <- p_val_table_stereo %>% 
+  filter(p_val_cat != "<=.01" & 
+           p_val_cat != ">.01 - <=.02" &
+           p_val_cat !=">.02 - <=.05") 
+stereo_nonsig_pvals <- sum(stereo_nonsig_pvals_table$n)
+
+# Amount of p-values that are not significant
+stereo_nonsig_percent <- stereo_nonsig_pvals/stereo_total_pvals*100
+stereo_nonsig_percent
+```
+
+**Percent of sig. p-values:**
+
+```{r stereo p vals sig}
+# Amount of p-values that are significant
+100 - stereo_nonsig_percent
 ```
 
 ### Merging/Overlap
 
-```{r}
+```{r mergin p val hist}
 overlap_p_val_data <- p_val_data %>% 
   filter(interpersonl_subcategory == 2)
 
@@ -399,16 +461,50 @@ hist(overlap_p_val_data$p_value,
      xlim = c(0, 1.0),
      breaks = 100)
 abline(v = .05, col="red", lwd=1, lty=1)
+```
 
+**Table of p-values:**
+
+```{r merging p val table}
 overlap_p_val_data %>% 
   select(p_val_cat) %>% 
   group_by(p_val_cat) %>% 
   count()
+
+p_val_table_overlap <- overlap_p_val_data %>% 
+  select(p_val_cat) %>% 
+  group_by(p_val_cat) %>% 
+  count() %>% 
+  mutate(p_val_cat = as.factor(p_val_cat)) 
+p_val_table_overlap
+```
+
+**Percent of non-sig. p-values:**
+
+```{r merging pval no sig}
+overlap_total_pvals <- sum(p_val_table_overlap$n)
+overlap_nonsig_pvals_table <- p_val_table_overlap %>% 
+  filter(p_val_cat != "<=.01" & 
+           p_val_cat != ">.01 - <=.02" &
+           p_val_cat !=">.02 - <=.05") 
+overlap_nonsig_pvals <- sum(overlap_nonsig_pvals_table$n)
+
+
+# Amount of studies that are not significant
+overlap_nonsig_percent <- overlap_nonsig_pvals/overlap_total_pvals*100
+overlap_nonsig_percent
+```
+
+**Percent of sig. p-values:**
+
+```{r merging pval sig}
+# Amount of studies that are significant
+100-overlap_nonsig_percent
 ```
 
 ### Interpersonal
 
-```{r}
+```{r feels p val hist}
 intpersonal_p_val_data <- p_val_data %>% 
   filter(interpersonl_subcategory == 3)
 
@@ -418,9 +514,81 @@ hist(intpersonal_p_val_data$p_value,
      xlim = c(0, 1.0),
      breaks = 100)
 abline(v = .05, col="red", lwd=1, lty=1)
+```
 
+**Table of p-values:**
+
+```{r feels p val table}
 intpersonal_p_val_data %>% 
   select(p_val_cat) %>% 
   group_by(p_val_cat) %>% 
   count()
+
+p_val_table_interpersonal <- intpersonal_p_val_data %>% 
+  select(p_val_cat) %>% 
+  group_by(p_val_cat) %>% 
+  count() %>% 
+  mutate(p_val_cat = as.factor(p_val_cat)) 
+p_val_table_interpersonal
+```
+
+**Percent of non-sig. p-values:**
+
+```{r feels p val non sig}
+interpersonal_total_pvals <- sum(p_val_table_interpersonal$n)
+p_val_table_interpersonal_nosig <- p_val_table_interpersonal %>% 
+  filter(p_val_cat != "<=.01" & 
+           p_val_cat != ">.01 - <=.02" &
+           p_val_cat !=">.02 - <=.05") 
+interpersonal_nonsig_pvals <- sum(p_val_table_interpersonal_nosig$n)
+
+# Amount of p-values that are non-significant
+interpersonal_nonsig_percent <- interpersonal_nonsig_pvals/interpersonal_total_pvals*100
+interpersonal_nonsig_percent
+```
+
+**Percent of sig. p-values:**
+
+```{r feels p val sig}
+# Amount of p-values that are significant
+100 - interpersonal_nonsig_percent
+```
+
+## Egger's MLM - Overall Model
+
+```{r}
+# Getting modified covariate that removes artifactual correlation between SMD ES and its related variance
+eggers_data <- meta_overall1 %>% 
+    mutate(Va = 4/(n_overall), 
+         sda = sqrt(Va),
+         sdi = sqrt(var_dunb))
+
+# Adapted from Rodgers & Putjevosky (2019) https://osf.io/7ak2m/?view_only=e74f9ddad3834e0e8c0bae9ef6b0441c
+
+mlma_egg_mod_sda <- rma.mv(dunb ~ 1 + sda, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data, test = "t")
+
+
+mlma_egg_mod_se <- rma.mv(dunb ~ 1 + sdi, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data, test = "t")
+
+
+mlma_results_sda <- with(mlma_egg_mod_sda, data.frame(Egger_test = "Modified Covariate",
+                                                      beta = b[2], 
+                                                      se = se[2], 
+                                                      p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+mlma_results_se <- with(mlma_egg_mod_se, data.frame(Egger_test = "Standard Error",
+                                                    beta = b[2], 
+                                                    se = se[2], 
+                                                    p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+egger_overall_results <- rbind(mlma_results_sda, mlma_results_se)
+egger_overall_results
 ```

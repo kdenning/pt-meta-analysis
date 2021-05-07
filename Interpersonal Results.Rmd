@@ -1,12 +1,18 @@
 ---
 title: "Interpersonal Results"
-author: "Kathryn Denning"
-date: "1/29/2021"
-output: html_document
+output: 
+    html_document:
+      code_download: TRUE
+      toc: TRUE
+      toc_float:
+        collapsed: FALSE
+      toc_depth: 1
+      code_folding: hide
 editor_options: 
   chunk_output_type: console
 ---
-```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, include = FALSE}
 # Cleaning
 ## import data
 
@@ -69,9 +75,9 @@ source("functions/meta_functions.R")
 meta_data <- meta_clean_func(converted_data)
 ```
 
-# Interpersonal Feelings
+# Interpersonal Feelings Results {.tabset .tabset-fade .tabset-pills}
 
-```{r feels data prep}
+```{r feels data prep, include = FALSE}
 feels <- meta_data %>% 
   mutate(pt_comparison = fct_collapse(pt_comparison, 
                                       self_v_control = c("1", "2"),
@@ -91,14 +97,16 @@ feels %<>%
 
 ```
 
-## Number of overall effects:
+## Descriptives
+
+### Number of overall effects:
 
 ```{r number of effect sizes feels}
 feels %>% 
   count()
 ```
 
-## Effects per comparison group:
+### Effects per comparison group:
 
 ```{r effects pt feels data}
 feels %>% 
@@ -137,13 +145,15 @@ feels %>%
 contrasts(feels$pt_comparison)
 ```
 
+**Results:**
+
 ```{r r feels model pt}
 feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
 
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ effect_size_num | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
                                     ~ 1 | outcome_scale_group), data = feels)
 
 feels_model
@@ -151,7 +161,18 @@ feels_model
 
 The intercept (self vs objective) is significantly different from 0. The simple effects indicate that self v control and other v control lead to significantly lower effect sizes than self v objective. Other v objective did not differ from the intercept.
 
-### Marginal main effects
+### Checking if model is over-parametized
+
+You can look at the code, but it appeared fine and we will not include the code run due to the code taking so long.
+
+```{r check if model is over parametized, eval = FALSE}
+# Checking if model is over-parametized
+# code is very slow, so will not include in markdown
+par(mfrow=c(2,2))
+profile(feels_model)
+```
+
+### Marginal main effects:
 
 ```{r emmeans feels breakdown}
 qdrq_feels1 <- qdrg(object = feels_model, data = feels)
@@ -172,12 +193,7 @@ emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
 
 The marginal main effects indicate that all effect sizes except self v control significantly differ from 0. However, both self and other vs objective have medium to large effect sizes, and other v control has a small effect size.
 
-```{r check if model is over parametized, include = FALSE}
-# Checking if model is over-parametized
-# code is very slow, so will not include in markdown
-par(mfrow=c(2,2))
-profile(feels_model)
-```
+## Heterogeneity
 
 ### Overall I2 for model
 
@@ -197,7 +213,7 @@ get_I2_levels(feels_model)
 
 Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
 
-### Post-hoc power
+## Post-hoc power
 
 * k = 184 is the number of effect sizes
 * Sample size is the average found earlier to the nearest number the r function would take
@@ -211,9 +227,9 @@ subgroup_power(n_groups = 4,
                es_type = "d")
 ```
 
-## Moderators
+# Moderator Results {.tabset .tabset-fade .tabset-pills}
 
-### Scales of measurement
+## Scales of measurement
 
 ```{r feels model scales mod}
 feels %>% 
@@ -238,6 +254,8 @@ feels_model_mod1
 
 Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons that have 0 studies per cell. There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). 
 
+### Heterogeneity
+
 #### I2 overall
 
 ```{r I2 overall scales}
@@ -256,7 +274,7 @@ get_I2_levels(feels_model_mod1)
 
 Most heterogeneity is explained by between-study variance, followed by between-outcomes variance.
 
-### Target - amount of information
+## Target - amount of information
 
 ```{r feels targ info mod}
 feels_model_mod2 <- rma.mv(dunb, 
@@ -270,6 +288,8 @@ feels_model_mod2
 ```
 
 None are significant. Emmeans won't work because redundant predictors were dropped from rma.mv model.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -289,7 +309,7 @@ get_I2_levels(feels_model_mod2)
 
 Most variance explained by between-study variance, with almost 12% explained by scales of measurement.
 
-### Target - In need/In distress target grouping (relevant to outcome category)
+## Target - In need/In distress target grouping (relevant to outcome category)
 
 ```{r feels targ need mod}
 feels_model_mod3 <- rma.mv(dunb, 
@@ -304,7 +324,7 @@ feels_model_mod3
 
 The intercept is significantly different from 0. The difference between other v control and intercept is marginal. There are no interactions.
 
-#### Marginal main effects
+### Marginal main effects
 
 ```{r emmeans feels empathetic need targ mod}
 qdrq_feels3 <- qdrg(object = feels_model_mod3, data = feels_mod)
@@ -314,6 +334,8 @@ emmeans_feels3
 ```
 
 Self and other vs objective still are different from 0 when the target is empathetic. Self and other vs control are not different from 0 when the target is empathetic. When the target is not empathetic, the only condition that does not differ from 0 is self vs control.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -333,7 +355,7 @@ get_I2_levels(feels_model_mod3)
 
 Most heterogeneity explained by between-studies variance, with over 13% by scales of measurement.
 
-### Sample size
+## Sample size
 
 ```{r sample size mod feels}
 feels_model_mod4 <- rma.mv(dunb, 
@@ -348,6 +370,8 @@ feels_model_mod4
 
 Intercept different from 0. No interaction with sample size.
 
+### Heterogeneity
+
 #### I2 overall
 
 ```{r n feels I2 overall}
@@ -360,4 +384,45 @@ get_I2_overall(feels_mod, feels_model_mod4)
 
 ```{r n feels I2 var levels}
 get_I2_levels(feels_model_mod4)
+```
+
+# Publication Bias - Egger's Test
+
+```{r}
+# Getting modified covariate that removes artifactual correlation between SMD ES and its related variance
+eggers_data_feels <- feels %>% 
+    mutate(Va = 4/(n_overall), 
+         sda = sqrt(Va),
+         sdi = sqrt(var_dunb))
+
+# Adapted from Rodgers & Putjevosky (2019) https://osf.io/7ak2m/?view_only=e74f9ddad3834e0e8c0bae9ef6b0441c
+
+mlma_egg_mod_sda_feels <- rma.mv(dunb ~ 1 + sda, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_feels, test = "t")
+
+
+mlma_egg_mod_se_feels <- rma.mv(dunb ~ 1 + sdi, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_feels, test = "t")
+
+
+mlma_results_sda_feels <- with(mlma_egg_mod_sda_feels, 
+                                 data.frame(Egger_test = "Modified Covariate",
+                                                      beta = b[2], 
+                                                      se = se[2], 
+                                                      p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+mlma_results_se_feels <- with(mlma_egg_mod_se_feels, 
+                                data.frame(Egger_test = "Standard Error",
+                                                    beta = b[2], 
+                                                    se = se[2], 
+                                                    p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+egger_feels_results <- rbind(mlma_results_sda_feels, mlma_results_se_feels)
+egger_feels_results
 ```

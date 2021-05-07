@@ -1,13 +1,18 @@
 ---
 title: "Overlap Results"
-author: "Kathryn Denning"
-date: "1/29/2021"
-output: html_document
+output: 
+    html_document:
+      code_download: TRUE
+      toc: TRUE
+      toc_float:
+        collapsed: FALSE
+      toc_depth: 1
+      code_folding: hide
 editor_options: 
   chunk_output_type: console
 ---
 
-```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+```{r setup data import and cleaning, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, include = FALSE}
 # Cleaning
 ## import data
 
@@ -70,7 +75,7 @@ source("functions/meta_functions.R")
 meta_data <- meta_clean_func(converted_data)
 ```
 
-# Overlap
+# Meta-analysis results for Overlap outcome {.tabset .tabset-fade .tabset-pills}
 
 ```{r overlap meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
@@ -90,14 +95,16 @@ overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_object
   filter(outcome_type == "Overlap")
 ```
 
-## Number of overall effects:
+## Descriptive statistics
+
+### Number of overall effects:
 
 ```{r effects overlap data}
 overlap_data %>% 
   count()
 ```
 
-## Effects per comparison group:
+### Effects per comparison group:
 
 ```{r effects pt overlap data}
 overlap_data %>% 
@@ -118,7 +125,7 @@ overlap_data %>%
 
 **To be used in power analysis**
 
-```{n per cell overlap}
+```{r n per cell overlap}
 overlap_data %>% 
   dplyr::select(n_pt, n_comparison) %>% 
   unique() %>% 
@@ -138,7 +145,7 @@ contrasts(overlap_data$pt_comparison)
 
 ```{r overlap model pt}
 overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
-levels(overlap_data$outcome_scale_group)
+#levels(overlap_data$outcome_scale_group)
 
 overlap_pt <- rma.mv(dunb, 
                       var_dunb,
@@ -151,7 +158,7 @@ overlap_pt
 
 The intercept is marginally different from zero. The pt v control condition does not differ significantly from the intercept.
 
-```{r check if model is over parametized, include = FALSE}
+```{r check if model is over parametized, eval = FALSE}
 # Checking if model is over-parametized
 # code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
@@ -159,7 +166,7 @@ profile(overlap_pt)
 #Looks fine
 ```
 
-### Marginal main effect
+## Marginal main effects
 
 ```{r emmeans overlap}
 qdrq_overlap <- qdrg(object = overlap_pt, data = overlap_data)
@@ -169,6 +176,8 @@ emmeans_overlap
 ```
 
 This comparison is the same as the overall model. Without the interaction, the values change slightly, but the pattern and significance do not.
+
+## Heterogeneity
 
 ### I2 overall model
 
@@ -188,7 +197,7 @@ get_I2_levels(overlap_pt)
 
 Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed structure.
 
-### Post-hoc power
+## Post-hoc power
 
 * k = 48 is the number of effect sizes
 * Sample size is the average found earlier to the nearest number the r function would take
@@ -202,9 +211,9 @@ subgroup_power(n_groups = 2,
                es_type = "d")
 ```
 
-## Moderators
+# Moderator Analyses {.tabset .tabset-fade .tabset-pills}
 
-### Scale of measurement
+## Scale of measurement
 
 ```{r overlap model scales mod}
 overlap_data %>% 
@@ -222,7 +231,7 @@ overlap_model_mod1
 
 Scale 7 (Self-report IOS merging/scales) while in the pt vs objective comparison is the reference group. These are simple effects in which the effect sizes become significantly lower for the pt vs objective comparison when merging is measured from overlap of traits/attributes or measures of social distancing. There are no interactions. 
 
-#### Marginal main effects
+### Marginal main effects
 
 ```{r emmeans overlap scale}
 qdrq_overlap2 <- qdrg(object = overlap_model_mod1, data = overlap_data)
@@ -232,6 +241,8 @@ emmeans_overlap2
 ```
 
 When using a self-reported merging scale both pt vs objective and control lead to medium to large effect sizes that differed from 0. When using both the attribution and social distance scales, neither comparison significantly differed from 0.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -251,7 +262,7 @@ get_I2_var_levels(overlap_data, overlap_model_mod1)
 
 Almost all of the heterogeneity can be explained by between-studies variance.
 
-### Target - amount of information
+## Target - amount of information
 
 ```{r}
 overlap_model_mod2 <- rma.mv(dunb, 
@@ -266,7 +277,7 @@ overlap_model_mod2
 
 None are significant. I2 lowered.
 
-#### Marginal main effects
+### Marginal main effects
 
 ```{r emmeans overlap targ info mod}
 qdrq_overlap3 <- qdrg(object = overlap_model_mod2, data = overlap_data)
@@ -276,6 +287,8 @@ emmeans_overlap3
 ```
 
 When target information is impoverished, tneither comparison significantly differs from 0. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a medium to large effect size. 
+
+### Heterogeneity
 
 #### Overall I2
 
@@ -297,9 +310,9 @@ Most of this heterogeneity is attributed to between-studies variance, with varia
 
 With there being no redundancies in the model and lower I2, I wonder if we can model an interaction with scale?
 
-### Both scale & target info
+## Both scale & target info
 
-```{r}
+```{r include = FALSE}
 #Modeled target information as a main effect since it had no interactions and, because, when I tried to model it with interactions it led to redundancies
 
 overlap_data %>% 
@@ -309,7 +322,9 @@ overlap_data %>%
 2*3*3
 
 #Should be 18 but there are 13, so the redundancies come from the fact that there are cells with 0 in it, which rma.mv is dropping: https://stats.stackexchange.com/questions/223918/multilevel-metaregression-in-r-redundant-predictors-dropped-metafor
+```
 
+```{r}
 overlap_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group*target_information,
@@ -320,6 +335,8 @@ overlap_model_mod3
 ```
 
 The I2 decreases having all three predictors in the model, though it is concerning that some cells are 0 and that was causing redundancies. Cannot model with emmeans because of redundancies.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -337,7 +354,7 @@ get_I2_var_levels(overlap_data, overlap_model_mod3)
 
 All variance is explained by between-studies variance. This is probably due to k being too small per cell.
 
-### Target - In-group target grouping (relevant to outcome category)
+## Target - In-group target grouping (relevant to outcome category)
 
 ```{r}
 overlap_data <- overlap_data %>% 
@@ -357,6 +374,7 @@ overlap_model_mod4
 
 The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept. Tried running an out-group moderator model as well, but it had a convergence issue.
 
+### Marginal main effects
 
 ```{r emmeans overlap in-group targ mod}
 qdrq_overlap4 <- qdrg(object = overlap_model_mod4, data = overlap_data)
@@ -366,6 +384,8 @@ emmeans_overlap4
 ```
 
 The marginal main effects indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-significant and are about the same regardless of if pt is being compared to the objective (.31) or control condition (.34). Both are lower than the in-group effect sizes.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -385,7 +405,7 @@ get_I2_var_levels(overlap_data, overlap_model_mod4)
 
 Most heterogeneity is explained by between-studies variance, followed by between-outcomes variance.
 
-### Sample size
+## Sample size
 
 ```{r sample size mod overlap}
 overlap_model_mod5 <- rma.mv(dunb, 
@@ -399,6 +419,8 @@ overlap_model_mod5
 ```
 
 Intercept different from 0. No interaction with sample size.
+
+### Heterogeneity
 
 #### I2 overall
 
@@ -417,3 +439,44 @@ get_I2_var_levels(overlap_data, overlap_model_mod5)
 ```
 
 Most heterogeneity is explained by between-studies variance. 
+
+# Publication Bias - Egger's Test
+
+```{r}
+# Getting modified covariate that removes artifactual correlation between SMD ES and its related variance
+eggers_data_overlap <- overlap_data %>% 
+    mutate(Va = 4/(n_overall), 
+         sda = sqrt(Va),
+         sdi = sqrt(var_dunb))
+
+# Adapted from Rodgers & Putjevosky (2019) https://osf.io/7ak2m/?view_only=e74f9ddad3834e0e8c0bae9ef6b0441c
+
+mlma_egg_mod_sda_overlap <- rma.mv(dunb ~ 1 + sda, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_overlap, test = "t")
+
+
+mlma_egg_mod_se_overlap <- rma.mv(dunb ~ 1 + sdi, 
+                           V = var_dunb, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_overlap, test = "t")
+
+
+mlma_results_sda_overlap <- with(mlma_egg_mod_sda_overlap, 
+                                 data.frame(Egger_test = "Modified Covariate",
+                                                      beta = b[2], 
+                                                      se = se[2], 
+                                                      p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+mlma_results_se_overlap <- with(mlma_egg_mod_se_overlap, 
+                                data.frame(Egger_test = "Standard Error",
+                                                    beta = b[2], 
+                                                    se = se[2], 
+                                                    p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+egger_overlap_results <- rbind(mlma_results_sda_overlap, mlma_results_se_overlap)
+egger_overlap_results
+```
