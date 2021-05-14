@@ -426,3 +426,127 @@ mlma_results_se_feels <- with(mlma_egg_mod_se_feels,
 egger_feels_results <- rbind(mlma_results_sda_feels, mlma_results_se_feels)
 egger_feels_results
 ```
+
+# Checking sub-sample heterogeneity
+
+```{r}
+feels %>% 
+  mutate(outcome_scale_group = dplyr::recode(outcome_scale_group,
+                                             `10` = "empathic emotions",
+                                             `11` = "helping behavior",
+                                             `13` = "harmful behavior",
+                                             `14` = "Other pos/sympathetic emotions",
+                                             `15` = "Negative emotions directed toward target",
+                                             `16` = "Perceptions of perspective taker")) %>%   # CHECK harmful behavior AND negative emotions are REVERSE CODED 
+  count(outcome_scale_group)
+```
+
+Cell with most effect sizes is empathic empotions (emapthy, empathic concern).
+
+### Within empathic emotions and each comparison, the cells become uneven.
+
+```{r}
+feels %>% 
+  filter(outcome_scale_group == 10) %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+## Meta sub-example w/ pt as moderator
+
+```{r}
+heterotest1_feels <- feels %>% 
+  filter(outcome_scale_group == 10)
+
+heterotest1_feels$outcome_scale_group <- droplevels(heterotest1_feels$outcome_scale_group)
+
+feels_model_heterotest1 <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = heterotest1_feels)
+
+feels_model_heterotest1
+```
+
+### Heterogeneity
+
+#### Overall
+
+```{r}
+get_I2_overall(heterotest1_feels, feels_model_heterotest1)
+```
+
+#### Levels
+
+```{r}
+get_I2_levels(feels_model_heterotest1)
+```
+
+### Post-hoc power
+
+```{r n per cell stereo hetero test 1}
+heterotest1_feels %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+**Rounded up on sample size because "sample size must be a multiple of n_groups."**
+
+```{r power stereo hetero test 1}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(1.03, -.39, .07, -.37), 
+               sample_size = 68,
+               k = 66,
+               es_type = "d")
+```
+
+## Meta sub-example w/ one pt condition
+
+** Using "other_v_objective" because it had most effect sizes per cell.**
+
+```{r}
+heterotest2_feels <- heterotest1_feels %>% 
+  filter(pt_comparison == "other_v_objective")
+
+feels_model_heterotest2 <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num), data = heterotest2_feels)
+
+feels_model_heterotest2
+```
+
+### Heterogeneity
+
+#### Overall
+
+```{r}
+get_I2_overall(heterotest2_feels, feels_model_heterotest2)
+```
+
+#### Levels
+
+```{r}
+get_I2_levels(feels_model_heterotest2)
+```
+
+### Post-hoc power
+
+
+```{r n per cell stereo hetero test 2}
+heterotest2_feels %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+Code below did not work. However, author had a shiny app using same code, so using that with the below data we found that power at approximately 90% heterogeneity is still high with the incredibly large effect size we found: .99
+
+Shiny app: https://jason-griffin.shinyapps.io/shiny_metapower/
+
+```{r power stereo hetero test 2, eval = FALSE}
+mpower(effect_size = .92, study_size = 53, k = 33, i2 = .92, es_type= "d", 
+       test_type = "two-tailed", p = 0.05)
+```

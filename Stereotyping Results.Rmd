@@ -712,3 +712,130 @@ mlma_results_se_stereo <- with(mlma_egg_mod_se_stereo,
 egger_stereo_results <- rbind(mlma_results_sda_stereo, mlma_results_se_stereo)
 egger_stereo_results
 ```
+
+# Checking sub-sample heterogeneity 
+
+## Number of effect sizes in each scale of measurement
+
+```{r}
+meta_stereo1 %>% 
+  mutate(outcome_scale_group = dplyr::recode(outcome_scale_group,
+                                                 `1` = "implicit stereo RT",
+                                                 `2` = "implicit stereo other",
+                                                 `3` = "stereo trait attribution or ratings",
+                                                 `4` = "agreement w stereotypes toward group",
+                                                 `5` = "essay stereo",
+                                                 `6` = "attitudes toward target")) %>% 
+  count(outcome_scale_group) 
+```
+
+We will use agreement with stereotypes/prejudice toward group, as it has the most effect sizes.
+
+### With each comparison, the cells become small though
+
+```{r}
+meta_stereo1 %>% 
+  filter(outcome_scale_group == 4) %>% 
+  group_by(pt_comparison) %>% 
+  count()
+```
+
+## Meta sub-example w/ pt as moderator
+
+```{r}
+heterotest1_stereo <- meta_stereo1 %>% 
+  filter(outcome_scale_group == 4)
+
+# Dropped crossed factor because we filtered down to one outcome
+stereo_meta1_heterotest <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = heterotest1_stereo)
+
+stereo_meta1_heterotest 
+```
+
+### Heterogeneity
+
+#### Overall
+
+```{r}
+get_I2_overall(heterotest1_stereo, stereo_meta1_heterotest)
+```
+
+#### Levels
+
+```{r}
+get_I2_levels(stereo_meta1_heterotest)
+```
+
+### Post-hoc power
+
+```{r n per cell stereo hetero test 1}
+heterotest1_stereo %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+**Rounded up on sample size because "sample size must be a multiple of n_groups."**
+
+```{r power stereo hetero test 1}
+subgroup_power(n_groups = 4, 
+               effect_sizes = c(.12, -.08, -.34, -.22), 
+               sample_size = 68,
+               k = 39,
+               es_type = "d")
+```
+
+## Meta sub-example w/ one pt instruction
+
+```{r}
+heterotest2_stereo <- heterotest1_stereo %>% 
+  filter(pt_comparison == "self_v_objective")
+
+# Dropped crossed factor and conditions because we filtered down to one outcome and instruction type
+stereo_meta1_heterotest2 <- rma.mv(dunb, 
+                      var_dunb,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num), data = heterotest2_stereo)
+
+stereo_meta1_heterotest2 
+```
+
+### Heterogeneity
+
+#### Overall
+
+```{r}
+get_I2_overall(heterotest2_stereo, stereo_meta1_heterotest2)
+```
+
+#### Levels
+
+```{r}
+get_I2_levels(stereo_meta1_heterotest2)
+```
+
+Heterogeneity goes back up... We did not remove "outcomes_within_sample_var" because some studies did include two multiple related measures (agreement with prejudice and stereotyping). Apparently there is some heterogeneity between these measures.
+
+### Post-hoc power
+
+
+```{r n per cell stereo hetero test 2}
+heterotest2_stereo %>% 
+  dplyr::select(n_pt, n_comparison) %>% 
+  unique() %>% 
+  summarise(mean(n_pt),
+            mean(n_comparison))
+```
+
+Code below did not work. However, author had a shiny app using same code, so using that with the below data we found that power at approximately 85% heterogeneity is incredibly low: 0.15.
+
+Shiny app: https://jason-griffin.shinyapps.io/shiny_metapower/
+
+```{r power stereo hetero test 2, eval = FALSE}
+mpower(effect_size = .11, study_size = 181, k = 16, i2 = .86, es_type= "d", 
+       test_type = "two-tailed", p = 0.05)
+```
+
