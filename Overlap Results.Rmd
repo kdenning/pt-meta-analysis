@@ -87,7 +87,9 @@ overlap_data <- meta_data %>%
   mutate(outcome_type = dplyr::recode(outcome_type,
                                `3` = "Interpersonal Feels",
                                `2` = "Overlap",
-                               `1` = "Stereotyping")) %>% 
+                               `1` = "Stereotyping"),
+          authors = as.factor(authors),
+         author_mod = as.factor(author_mod)) %>% 
   mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
 
 overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objective",
@@ -150,13 +152,25 @@ overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
 overlap_pt <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num, 
                                     ~ 1 | outcome_scale_group), data = overlap_data)
 
 overlap_pt
 ```
 
 The intercept is marginally different from zero. The pt v control condition does not differ significantly from the intercept.
+
+### Adding paper
+
+```{r overlap model pt}
+overlap_pt <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var/effect_size_num, 
+                                    ~ 1 | outcome_scale_group), data = overlap_data)
+
+overlap_pt
+```
 
 ```{r check if model is over parametized, eval = FALSE}
 # Checking if model is over-parametized
@@ -223,7 +237,7 @@ overlap_data %>%
 overlap_model_mod1 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), 
+                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num), 
                       data = overlap_data)
 
 overlap_model_mod1
@@ -268,7 +282,7 @@ Almost all of the heterogeneity can be explained by between-studies variance.
 overlap_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num,
                                     ~ 1 | outcome_scale_group/effect_size_num), 
                       data = overlap_data)
 
@@ -328,7 +342,7 @@ overlap_data %>%
 overlap_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var), 
+                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num), 
                       data = overlap_data)
 
 overlap_model_mod3
@@ -365,8 +379,8 @@ overlap_data$target_ingroup_nonspecific <- droplevels(overlap_data$target_ingrou
 overlap_model_mod4 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_ingroup_nonspecific,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                      random = list(~ 1 | sample_number_total/outcome_type/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
 overlap_model_mod4
@@ -411,8 +425,8 @@ Most heterogeneity is explained by between-studies variance, followed by between
 overlap_model_mod5 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                      random = list(~ 1 | sample_number_total/outcome_type/effect_size_num,
+                                    ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
 overlap_model_mod5
@@ -453,14 +467,14 @@ eggers_data_overlap <- overlap_data %>%
 
 mlma_egg_mod_sda_overlap <- rma.mv(dunb ~ 1 + sda, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | sample_number_total/outcome_type/effect_size_num, 
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_overlap, test = "t")
 
 
 mlma_egg_mod_se_overlap <- rma.mv(dunb ~ 1 + sdi, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | sample_number_total/outcome_type/effect_size_num, ,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_overlap, test = "t")
 

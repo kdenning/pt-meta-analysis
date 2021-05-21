@@ -134,7 +134,7 @@ k_per_comparison %>%
 
 We will have to collapse across across "day in the life" and "other" control conditions. As our "Self PT versus Objective" is only one study under our pre-registered limit - and this is a preliminary analysis for a doctoral requirement - we will include that category for this analysis with the expectation that when we include regression coefficients and data from contacted authors, it will be over our limit (spoiler alert: it will). Therefore, for the analysis specifically examining interpersonal feelings outcomes, we will not collapse across Imagine-self and Imagine-other instruction comparisons. 
 
-# Overall Multivariate Meta-analysis {.tabset .tabset-fade .tabset-pills}
+# Descriptive Data Check
 
 ```{r overall meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
@@ -146,7 +146,9 @@ meta_overall1 <- meta_data %>%
   mutate(outcome_type = dplyr::recode(outcome_type,
                                `3` = "Interpersonal Feels",
                                `2` = "Overlap",
-                               `1` = "Stereotyping")) %>% 
+                               `1` = "Stereotyping"),
+         authors = as.factor(authors),
+         author_mod = as.factor(author_mod)) %>% 
   mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
          dunb = ifelse(outcome_type == "Stereotyping",
                        dunb*-1,
@@ -159,9 +161,68 @@ meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objec
                                      "pt_v_control"))
 
 #for this overall model, needed to reverse score the stereotyping outcome again; the initial reverse score had made higher scores on the scale = more stereotyping (the more popular direction of research); the other outcome categories meant higher scores = more positive outcomes. For the same analysis, they should all be going in the same direction.
-
-# WILL WANT TO VERIFY REVERSE SCORING BEFORE PUBLICATION, AS VERY CRUCIAL
 ```
+
+## Histograms
+
+```{r}
+hist(meta_overall1$d)
+hist(meta_overall1$dunb)
+hist(meta_overall1$n_overall)
+```
+
+The histograms for the outcome - both unbiased and not - looks evenly distributed. N is skewed, but that is not surprising.
+
+NEED TO MAKE A FEW FACTORS
+
+## Descriptives
+
+```{r}
+descrip_data <- meta_overall1 %>% 
+  select(d, dunb, var, var_dunb, authors, outcomes_within_sample_var, pt_comparison, outcome_type, outcome_scale_group, target_information, target_ingroup_nonspecific, target_out_minor, target_adversary, target_empathetic_need, n_overall)
+
+psych::describe(descrip_data) # this all looks correct
+```
+
+This all looks correct
+
+```{r}
+cor_data <- descrip_data %>% 
+  select(d, dunb, var, var_dunb, n_overall)
+
+cor(cor_data)
+```
+
+- Is it weird that d and dunb are only slightly correlated, while var and var_dunb are almost 100%? Does this matter?
+- Makes sense that variance is negatively correlated with sample size, as variance gets smaller as sample size increases and, thus, they have an inverse relationship.
+
+## Boxplot 
+
+```{r}
+descrip_data %<>% 
+  mutate(pt_comparison = dplyr::recode(pt_comparison,
+                                       `pt_v_objective` = "v_obj",
+                                       `pt_v_control` = "v_ctrl"),
+         outcome_type = dplyr::recode(outcome_type,
+                                      `Interpersonal Feels` = "feels",
+                                      `Overlap` = "ovrlp",
+                                      `Stereotyping` = "stereo"))
+
+ mutate(outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping"
+
+boxplot(dunb ~ pt_comparison*outcome_type, data = descrip_data,
+        col = (c("gold", "darkgreen")),
+        main = "Effect sizes by predictors for multivariate model")
+```
+
+There are some outlier data points, which was also indicated by the histogram. We will want to check those that are particularly high and alone to see if they were coded incorrectly by us or in the effect size conversion.
+
+CHECK
+
+# Overall Multivariate Meta-analysis {.tabset .tabset-fade .tabset-pills}
 
 ## Descriptive info
 
@@ -169,7 +230,6 @@ meta_overall1 %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_objec
 
 ```{r descriptive info before collapsing conditions}
 meta_overall1 %>% 
-  mutate(authors = as.factor(authors)) %>% 
   dplyr::select(authors) %>% 
   unique() %>% 
   count()
@@ -249,17 +309,33 @@ contrasts(meta_overall1$outcome_type)
 
 **Results:**
 
+### Nesting effect size within sample x outcome scale of measurement
+
+```{r overall meta interaction mod}
+meta_multi1 <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison*outcome_type,
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), data = meta_overall1)
+
+meta_multi1
+```
+
+**After looking at the high amount of heterogeneity explained by sample (below), decided to see if nesting within paper explained a large amount as well.**
+
+### Adding a third level nesting within paper (not pre-registered)
+
 ```{r overall meta interaction mod}
 meta_multi2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_type,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), data = meta_overall1)
 
 meta_multi2
 ```
 
-The intercept is when When pt is compared to the objective condition and interpersonal feels is the outcome. When looking at the main effect, this indicates that - in the interpersonal feeling category - the pt v control condition leads to significantly lower effect sizes the pt vs objective. When comparing pt v objective, there is no difference between the interpersonal feels and overlap conditions, but the stereotyping condition is significantly less than the interpersonal feels condition. The estimates representing the contrasts signify the "difference between the differences" (e.g., how large is the difference between the difference between pt comparison levels and outcome levels being compared in this contrast?). This model demonstrates this difference of differences is significant when comparing the stereotyping outcome and pt v control to the interpersonal feels outcome when pt v objective, but only marginal when comparing pt v control in the overlap outcome to the same reference group.
+The intercept is when pt is compared to the objective condition and interpersonal feels is the outcome. When looking at the main effect, this indicates that - in the interpersonal feeling category - the pt v control condition leads to significantly lower effect sizes than the pt vs objective. When comparing pt v objective, there is no difference between the interpersonal feels and overlap conditions, but the stereotyping condition is significantly less than the interpersonal feels condition. The estimates representing the contrasts signify the "difference between the differences" (e.g., how large is the difference between the difference between pt comparison levels and outcome levels being compared in this contrast?). This model demonstrates this difference of differences is significant when comparing the stereotyping outcome and pt v control to the interpersonal feels outcome when pt v objective, but only marginal when comparing pt v control in the overlap outcome to the same reference group.
 
 We then ran pairwise comparisons to know the following differences:
 
@@ -269,9 +345,7 @@ We then ran pairwise comparisons to know the following differences:
 anova(meta_multi2, btt=5:6)
 ```
 
-The two contrasts are significantly different.
-
-The interactions in the multivariate overall model tells us there are statistical differences between outcome context and pt condition, but does not tell us the effect sizes per cell (each outcome and pt condition) and if they differ from 0. These were obtained using emmeans.
+Overlap and stereotyping do significantly differ from one another.
 
 ## Marginal main effects
 
@@ -292,7 +366,7 @@ emmeans_multi %>% ggplot(aes(x = pt_comparison, y = emmean)) +
   scale_x_discrete(labels = c('Vs Objective','Vs Control'))
 ```
 
-The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .53). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control (.28), but again, we have more results included. We also obtained our results in the interactive MLM model, not individual meta-analysis models as McAuliffe et al did. MLM models employ shrinkage on the estimates that would not occur when subsetting data down to the individual comparisons, which also accounts for differences between our results and McAuliffe results. This also allows us to retain a larger k.
+The interpersonal feelings outcome results are consistent with McAuliffe's findings for empathy/empathic concern (they found .68 for Imagine-other and .56 for Imagine-self vs objective, and we are collapsed across here and with other effects to a .58). However, they found a lower average effect for Imagine-other vs no-instructions (.08) than our comparison versus the control (.28), but again, we have more results included. We also obtained our results in the interactive MLM model, not individual meta-analysis models as McAuliffe et al did. MLM models employ shrinkage on the estimates that would not occur when subsetting data down to the individual comparisons, which also accounts for differences between our results and McAuliffe results. This also allows us to retain a larger k.
 
 For the categories other than Interpersonal Feels, none of the other comparisons are statistically different from 0. Because of the significant heterogeneity that is moderated in our overall model, we are going to skip other moderators at the overall model level to explore models within each outcome more deeply. Clearly, at this higher-order level, there is too much variation between the studies for them to be compared as the same thing.
 
@@ -308,21 +382,37 @@ profile(meta_multi2)
 
 ### I2 overall
 
+#### Without paper
+
 ```{r overall I2 multi}
-get_I2_overall(meta_overall1, meta_multi2)
+get_I2_overall(meta_overall1, meta_multi1)
 ```
 
 Overall heterogeneity is very high. 91.13% of the variance can be explained due to differences in the studies not explained by our predictors. 
+
+#### With paper
+
+```{r overall I2 multi}
+get_I2_overall(meta_overall1, meta_multi2)
+```
 
 ### I2 for levels of variance
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
+#### Without paper
+
 ```{r levels I2 multi}
-get_I2_levels(meta_multi2)
+get_I2_levels(meta_multi1)
 ```
 
 Most of this heterogeneity is explained by between-study variance, followed by between-outcome (within-study) variance. 
+
+#### With paper
+
+```{r levels I2 multi}
+get_I2_levels(meta_multi2)
+```
 
 ## Post-hoc Power
 
@@ -567,14 +657,14 @@ eggers_data <- meta_overall1 %>%
 
 mlma_egg_mod_sda <- rma.mv(dunb ~ 1 + sda, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var/effect_size_num,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data, test = "t")
 
 
 mlma_egg_mod_se <- rma.mv(dunb ~ 1 + sdi, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var/effect_size_num,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data, test = "t")
 
