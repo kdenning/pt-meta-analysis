@@ -173,8 +173,6 @@ hist(meta_overall1$n_overall)
 
 The histograms for the outcome - both unbiased and not - looks evenly distributed. N is skewed, but that is not surprising.
 
-NEED TO MAKE A FEW FACTORS
-
 ## Descriptives
 
 ```{r}
@@ -208,11 +206,6 @@ descrip_data %<>%
                                       `Overlap` = "ovrlp",
                                       `Stereotyping` = "stereo"))
 
- mutate(outcome_type = dplyr::recode(outcome_type,
-                               `3` = "Interpersonal Feels",
-                               `2` = "Overlap",
-                               `1` = "Stereotyping"
-
 boxplot(dunb ~ pt_comparison*outcome_type, data = descrip_data,
         col = (c("gold", "darkgreen")),
         main = "Effect sizes by predictors for multivariate model")
@@ -220,7 +213,63 @@ boxplot(dunb ~ pt_comparison*outcome_type, data = descrip_data,
 
 There are some outlier data points, which was also indicated by the histogram. We will want to check those that are particularly high and alone to see if they were coded incorrectly by us or in the effect size conversion.
 
-CHECK
+## Checking Outliers
+
+### Outliers over 2 or -2
+
+```{r}
+out_dat <- meta_overall1 %>% 
+  filter(dunb >= 2 | dunb <= -2) #7 studies with outliers this large
+```
+
+All effect sizes were hand calculated by us using escalc in batches, so going to check that looks normal.
+
+### Checking the first effect size (Abbate et al)
+
+#### Checking escalc as an individual
+
+```{r}
+abbate_eff4_check <- escalc(measure = "SMD", m1i = 1.75, m2i = 3.08, sd1i = 0.36, sd2i = 0.4, n1i = 24, n2i = 19, vtype = "UB") #exactly the same using individual code as running in group
+```
+
+It is identical
+
+#### Hand calculating
+
+```{r}
+d_num <- (1.75-3.08)
+sd_pool <- sqrt((.36^2+.4^2)/2)
+
+
+d <- d_num/sd_pool
+d
+```
+
+Slight variation, but pretty much the same - escalc seems to be doing things correctly
+
+### Checking conversions from r (Shih et al; effet size 329)
+
+Entered the data into this website and it was exactly the same: https://www.escal.site/
+
+### Hand calculation
+
+````{r}
+d = 2*.87/ sqrt(1 - .87^2)
+d
+```
+
+Also roughly the same - it appears the calculation is correct. The correlation is VERY large, so this makes sense. Need to re-check the data (for the 5th time) from the articles to see if what we have in the dataset is correct for the outlier data.
+
+### Checked data from articles
+
+**Looked to see if data was correct that was pulled from the papers:**
+
+Abbate et al - correct
+Edwards et al - correct
+Lopez-Perez et al - correct
+Shih et al (effect size 329) - correct
+Shih et al (effect size 331) - correct
+Skorinko & Sinclair (360, 361) - correct; these are where we separated an interaction and calculated main effects per subset (stereotypical and less stereotypical stimuli participants)
 
 # Overall Multivariate Meta-analysis {.tabset .tabset-fade .tabset-pills}
 
@@ -325,7 +374,7 @@ meta_multi1
 
 ### Adding a third level nesting within paper (not pre-registered)
 
-```{r overall meta interaction mod}
+```{r overall meta interaction mod with author nesting}
 meta_multi2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_type,
@@ -392,7 +441,7 @@ Overall heterogeneity is very high. 91.13% of the variance can be explained due 
 
 #### With paper
 
-```{r overall I2 multi}
+```{r overall I2 multi with paper}
 get_I2_overall(meta_overall1, meta_multi2)
 ```
 
@@ -410,7 +459,7 @@ Most of this heterogeneity is explained by between-study variance, followed by b
 
 #### With paper
 
-```{r levels I2 multi}
+```{r levels I2 multi with paper}
 get_I2_levels(meta_multi2)
 ```
 
