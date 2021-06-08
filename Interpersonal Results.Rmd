@@ -75,7 +75,7 @@ source("functions/meta_functions.R")
 meta_data <- meta_clean_func(converted_data)
 ```
 
-# Interpersonal Feelings Results {.tabset .tabset-fade .tabset-pills}
+# Descriptives {.tabset .tabset-fade .tabset-pills}
 
 ```{r feels data prep, include = FALSE}
 feels <- meta_data %>% 
@@ -91,13 +91,12 @@ feels <- meta_data %>%
                                      "self_v_objective",
                                      "self_v_control",
                                      "other_v_objective",
-                                     "other_v_control"))
+                                     "other_v_control"),
+         authors = as.factor(authors))
 feels %<>% 
   filter(outcome_type == "3")
 
 ```
-
-## Descriptives
 
 ### Number of overall effects:
 
@@ -116,7 +115,7 @@ feels %>%
 
 19 is one under our limit of 20, so this will need to be taken as exploratory for the purposes of this preliminary analysis for my prelims. I want to look at these comparisons because they speak to McAuliffe et al's meta-analytic results.
 
-### Number of unique samples
+### Number of samples:
 
 ```{r overlap samples}
 feels %>% 
@@ -129,13 +128,15 @@ feels %>%
 
 **To be used in power analysis**
 
-```{n per cell overlap}
+```{r n per cell overlap}
 feels %>% 
   dplyr::select(n_pt, n_comparison) %>% 
   unique() %>% 
   summarise(mean(n_pt),
             mean(n_comparison))
 ```
+
+# Interpersonal Feelings Results {.tabset .tabset-fade .tabset-pills}
 
 ## Model results
 
@@ -145,7 +146,7 @@ feels %>%
 contrasts(feels$pt_comparison)
 ```
 
-**Results:**
+### Results nesting outcomes within sample x by scale type
 
 ```{r r feels model pt}
 feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
@@ -153,29 +154,46 @@ feels$outcome_scale_group <- droplevels(feels$outcome_scale_group)
 feels_model <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group), data = feels)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels)
 
 feels_model
 ```
+
+### Adding paper as nesting factor
+
+```{r r feels model pt auth}
+feels_model_auth <- rma.mv(dunb, 
+                      var_dunb,
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = feels)
+
+feels_model_auth
+```
+
+Looking at the sigma's, it is clear that paper accounts for a large amount of variance and should be included in the model. We will proceed with this model.
 
 The intercept (self vs objective) is significantly different from 0. The simple effects indicate that self v control and other v control lead to significantly lower effect sizes than self v objective. Other v objective did not differ from the intercept.
 
 ### Checking if model is over-parametized
 
-You can look at the code, but it appeared fine and we will not include the code run due to the code taking so long.
-
 ```{r check if model is over parametized, eval = FALSE}
 # Checking if model is over-parametized
-# code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
-profile(feels_model)
+profile(feels_model_auth)
 ```
+
+Looks good!
 
 ### Marginal main effects:
 
+#### Without author/paper:
+
 ```{r emmeans feels breakdown}
-qdrq_feels1 <- qdrg(object = feels_model, data = feels)
+qdrq_feels1 <- qdrg(object = feels_model_auth, data = feels)
 
 emmeans_feels1 <- summary(emmeans(qdrq_feels1, "pt_comparison"))
 emmeans_feels1
@@ -184,18 +202,20 @@ emmeans_feels1 %>% ggplot(aes(x = pt_comparison, y = emmean)) +
   geom_col() +
   theme_minimal() +
   labs(title = "Imagine-self vs other & objective vs control instructions in interpersonal only",
-       subtitle = "higher effect sizes = better outcome",
+       subtitle = "Higher effect sizes = better outcome",
        x = "Perpsective taking comparison",
        y = "Average effect size (d unbiased)") +
   scale_x_discrete(labels = c('Self vs Objective','Self vs Control',
                               'Other vs Objective', 'Other vs Control'))
 ```
 
-The marginal main effects indicate that all effect sizes except self v control significantly differ from 0. However, both self and other vs objective have medium to large effect sizes, and other v control has a small effect size.
+The marginal main effects indicate that all effect sizes differ from 0. However, both self and other vs objective have medium to large effect sizes, and other and self v control have a small effect size.
 
 ## Heterogeneity
 
 ### Overall I2 for model
+
+#### Without paper:
 
 ```{r overall I2 feels}
 get_I2_overall(feels, feels_model)
@@ -203,15 +223,31 @@ get_I2_overall(feels, feels_model)
 
 High heterogeneity.
 
+#### With paper:
+
+```{r overall I2 feels auth}
+get_I2_overall(feels, feels_model_auth)
+```
+
 ### I2 for levels of variance
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r levels I2 feels}
+#### Without paper:
+
+```{r levels I2 feels no paper}
 get_I2_levels(feels_model)
 ```
 
-Most heterogeneity is explained by between-studies variance. A little more than 11% is explained by between-outcomes variance.
+Most heterogeneity is explained by between-studies variance.
+
+#### With paper:
+
+```{r levels I2 feels paper}
+get_I2_levels(feels_model_auth)
+```
+
+When including paper in the model, most variance is explained by paper.
 
 ## Post-hoc power
 
@@ -221,10 +257,64 @@ Most heterogeneity is explained by between-studies variance. A little more than 
 
 ```{r power feels}
 subgroup_power(n_groups = 4, 
-               effect_sizes = c(.51, .26, .55, .29), 
+               effect_sizes = c(.54, .31, .56, .30), 
                sample_size = 124,
                k = 184,
                es_type = "d")
+```
+
+## Forest plot
+
+```{r}
+par(mfrow=c(1,1))
+forest(feels_model_auth, 
+       slab = paste(feels$authors, 
+                    feels$Year, sep = ", "),
+       header="Author(s) and Year",
+       main = "Interpersonal feelings forest plot",
+       ylim = c(-7, 203),
+       rows = c(-2:16, 23:57, 64:125, 132:201), 
+       order = order(feels$pt_comparison),
+       addfit=FALSE,
+       cex=0.3,
+       top = 0)
+
+# self vs obj: 19
+# self v control: 35
+# other v objective: 62
+# other v control: 70
+
+text(x=-9.7, y=-5, labels=c("Self vs Objective"), cex = .6)
+addpoly(x = 0.544, 
+        sei = 0.138, 
+        ci.lb = 0.2739,
+        ci.ub = 0.815, 
+        rows = -5,
+        cex = .6)
+
+text(x=-9.8, y=20, labels=c("Self vs control"), cex = .6)
+addpoly(x = 0.315, 
+        sei = 0.135, 
+        ci.lb = 0.0509,
+        ci.ub = 0.579, 
+        rows = 20,
+        cex = .6)
+
+text(x=-9.7, y=60.5, labels=c("Other vs Objective"), cex = .6)
+addpoly(x = 0.559, 
+        sei = 0.130, 
+        ci.lb = 0.3044,
+        ci.ub = 0.813, 
+        rows = 60.5,
+        cex = .6)
+
+text(x=-9.8, y=129, labels=c("Other vs control"), cex = .6)
+addpoly(x = 0.304, 
+        sei = 0.130, 
+        ci.lb = 0.0485,
+        ci.ub = 0.560, 
+        rows = 129,
+        cex = .6)
 ```
 
 # Moderator Results {.tabset .tabset-fade .tabset-pills}
@@ -246,13 +336,13 @@ feels_mod$outcome_scale_group <- droplevels(feels_mod$outcome_scale_group)
 feels_model_mod1 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), 
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var), 
                       data = feels_mod)
 
 feels_model_mod1
 ```
 
-Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons that have 0 studies per cell. There were no significant interactions (so one instruction did not work better with one scale than another in comparison to intercept). 
+Scale group 10 (Empathy) is the reference group. Dropped scale group 16 since there was only one study in it. The analysis dropped redundant comparisons that have 0 studies per cell. There was one significant interaction - Self v control:outcome scale group 15 (negative emotions; was reverse coded already).
 
 ### Heterogeneity
 
@@ -280,7 +370,7 @@ Most heterogeneity is explained by between-study variance, followed by between-o
 feels_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
@@ -315,7 +405,7 @@ Most variance explained by between-study variance, with almost 12% explained by 
 feels_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_emapthetic_need,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
@@ -333,7 +423,7 @@ emmeans_feels3 <- summary(emmeans(qdrq_feels3, "pt_comparison", "target_emapthet
 emmeans_feels3
 ```
 
-Self and other vs objective still are different from 0 when the target is empathetic. Self and other vs control are not different from 0 when the target is empathetic. When the target is not empathetic, the only condition that does not differ from 0 is self vs control.
+When the target is empathetic (1), only when the instructions are other focused and the comparison is the control condition is there no difference from 0. Self and other vs control are not different from 0 when the target is empathetic. When the target is not empathetic, the only condition that does not differ from 0 is self vs control.
 
 ### Heterogeneity
 
@@ -361,7 +451,7 @@ Most heterogeneity explained by between-studies variance, with over 13% by scale
 feels_model_mod4 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                       data = feels_mod)
 
@@ -399,14 +489,14 @@ eggers_data_feels <- feels %>%
 
 mlma_egg_mod_sda_feels <- rma.mv(dunb ~ 1 + sda, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_feels, test = "t")
 
 
 mlma_egg_mod_se_feels <- rma.mv(dunb ~ 1 + sdi, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_feels, test = "t")
 
@@ -463,7 +553,7 @@ heterotest1_feels$outcome_scale_group <- droplevels(heterotest1_feels$outcome_sc
 feels_model_heterotest1 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = heterotest1_feels)
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var), data = heterotest1_feels)
 
 feels_model_heterotest1
 ```
@@ -512,7 +602,7 @@ heterotest2_feels <- heterotest1_feels %>%
 
 feels_model_heterotest2 <- rma.mv(dunb, 
                       var_dunb,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num), data = heterotest2_feels)
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var), data = heterotest2_feels)
 
 feels_model_heterotest2
 ```

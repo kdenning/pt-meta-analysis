@@ -46,6 +46,8 @@ library(car)
 library(tidyverse)
 library(emmeans)
 library(metapower)
+library(meta)
+#library(dmetar)
 
 # Setting global chunk options
 knitr::opts_chunk$set(echo = TRUE,
@@ -75,7 +77,7 @@ source("functions/meta_functions.R")
 meta_data <- meta_clean_func(converted_data)
 ```
 
-# Meta-analysis results for Overlap outcome {.tabset .tabset-fade .tabset-pills}
+# Descriptives {.tabset .tabset-fade .tabset-pills}
 
 ```{r overlap meta data prep, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
 #collapsing across conditions for data-prep
@@ -97,16 +99,14 @@ overlap_data %<>% mutate(pt_comparison = fct_relevel(pt_comparison, "pt_v_object
   filter(outcome_type == "Overlap")
 ```
 
-## Descriptive statistics
-
-### Number of overall effects:
+## Number of overall effects:
 
 ```{r effects overlap data}
 overlap_data %>% 
   count()
 ```
 
-### Effects per comparison group:
+## Effects per comparison group:
 
 ```{r effects pt overlap data}
 overlap_data %>% 
@@ -114,7 +114,7 @@ overlap_data %>%
   count()
 ```
 
-### Number of unique samples
+## Number of unique samples
 
 ```{r overlap samples}
 overlap_data %>% 
@@ -123,7 +123,7 @@ overlap_data %>%
   count()
 ```
 
-### Average sample size per cell
+## Average sample size per cell
 
 **To be used in power analysis**
 
@@ -135,15 +135,19 @@ overlap_data %>%
             mean(n_comparison))
 ```
 
-## Results
+# Meta-analysis results for Overlap outcome {.tabset .tabset-fade .tabset-pills}
+
+## Model Results
 
 *Note: this comparison is the same as in the overall model interacting with outcome types, as the small k per cell in the overlap/merging category was the reason we had to collapse cross other perspective taking comparisons in that overall model.*
 
-**Contrasts:**
+### Contrasts
 
 ```{r overlap contrasts}
 contrasts(overlap_data$pt_comparison)
 ```
+
+### Model nesting outcomes within sample crossed with scale type
 
 ```{r overlap model pt}
 overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
@@ -152,7 +156,7 @@ overlap_data$outcome_scale_group <- droplevels(overlap_data$outcome_scale_group)
 overlap_pt <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num, 
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
                                     ~ 1 | outcome_scale_group), data = overlap_data)
 
 overlap_pt
@@ -160,29 +164,39 @@ overlap_pt
 
 The intercept is marginally different from zero. The pt v control condition does not differ significantly from the intercept.
 
-### Adding paper
+### Model adding paper as nesting factor
 
-```{r overlap model pt}
-overlap_pt <- rma.mv(dunb, 
+```{r overlap model pt with authors}
+overlap_pt_auth <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group), data = overlap_data)
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = overlap_data)
 
-overlap_pt
+overlap_pt_auth
 ```
 
-```{r check if model is over parametized, eval = FALSE}
+The intercept is no longer marginally different from zero when we account for variance due to paper.
+
+## Checking if model is overparemetized 
+
+**Doing this for model with author as it has the extra nesting parameter.**
+
+```{r check if model is over parametized}
 # Checking if model is over-parametized
-# code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
-profile(overlap_pt)
+profile(overlap_pt_auth)
 #Looks fine
 ```
 
+Looks good! No gaps or excessively flat areas
+
 ## Marginal main effects
 
-```{r emmeans overlap}
+### Withouut paper
+
+```{r emmeans overlap no paper}
 qdrq_overlap <- qdrg(object = overlap_pt, data = overlap_data)
 
 emmeans_overlap <- summary(emmeans(qdrq_overlap, "pt_comparison"))
@@ -191,38 +205,105 @@ emmeans_overlap
 
 This comparison is the same as the overall model. Without the interaction, the values change slightly, but the pattern and significance do not.
 
+### With paper
+
+```{r emmeans overlap with paper}
+qdrq_overlap_auth <- qdrg(object = overlap_pt_auth, data = overlap_data)
+
+emmeans_overlap_auth <- summary(emmeans(qdrq_overlap_auth, "pt_comparison"))
+emmeans_overlap_auth
+```
+
+Lower parameters than without paper, but still not significantly diff from 0.
+
 ## Heterogeneity
 
 ### I2 overall model
 
-```{r I2 overall overlap}
+#### Without paper
+
+```{r I2 overall overlap no paper}
 get_I2_overall(overlap_data, overlap_pt)
 ```
 
 This heterogeneity is still high, but lower than with the stereotyping outcome or the overall model with perspective taking interacting with outcome type.
 
+#### With paper
+
+```{r I2 overall overlap with paper}
+get_I2_overall(overlap_data, overlap_pt_auth)
+```
+
 ### I2 for levels of variance
 
 *Left value corresponds to top sigma in Variance components output in model results (Sample_number_total). Right-most value corresponds to bottom sigma (Outcome_scale group).*
 
-```{r I2 levels overlap}
+#### Without paper
+
+```{r I2 levels overlap no paper}
 get_I2_levels(overlap_pt)
 ```
 
 Most of the heterogeneity is due to between-studies variance. However, a large amount is also due to scales of measurement in the crossed structure.
 
+#### With paper
+
+```{r I2 levels overlap with paper}
+get_I2_levels(overlap_pt_auth)
+```
+
+When we add in paper, we see that most of the between-studies variance is actually due to paper, not sample. This seems problematic.
+
 ## Post-hoc power
 
 * k = 48 is the number of effect sizes
 * Sample size is the average found earlier to the nearest number the r function would take
-* The effect sizes are from the marginal effect size outcomes
+* The effect sizes are from the marginal effect size outcomes using paper, as they are smaller
 
 ```{r power overlap}
 subgroup_power(n_groups = 2, 
-               effect_sizes = c(.40, .33), 
+               effect_sizes = c(.24, .22), 
                sample_size = 132,
                k = 48,
                es_type = "d")
+```
+
+Impossible to find a difference, but that is basically because there isn't one...
+
+## Forest Plot 
+
+**For final model including author**
+
+```{r}
+par(mfrow=c(1,1))
+forest(overlap_pt_auth, 
+       slab = paste(overlap_data$authors, 
+                    overlap_data$Year, sep = ", "),
+       header="Author(s) and Year",
+       showweights=TRUE,
+       main = "Overlap/merging forest plot",
+       ylim = c(-2, 57),
+       order = order(overlap_data$pt_comparison),
+       rows = c(-1:29, 33:54),
+       addfit=FALSE,
+       cex=0.65)
+
+text(x=-7, y=31, labels=c("PT vs Control"))
+text(x=-7, y=-3, labels=c("PT vs Objective"))
+
+addpoly(x = 0.244, 
+        sei = 0.222, 
+        ci.lb = -0.191,
+        ci.ub = 0.678, 
+        rows = -3,
+        cex = .8)
+
+addpoly(x = 0.215, 
+        sei = 0.221, 
+        ci.lb = -0.218,
+        ci.ub = 0.648, 
+        rows = 31,
+        cex = .8)
 ```
 
 # Moderator Analyses {.tabset .tabset-fade .tabset-pills}
@@ -237,7 +318,7 @@ overlap_data %>%
 overlap_model_mod1 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num), 
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var), 
                       data = overlap_data)
 
 overlap_model_mod1
@@ -274,16 +355,14 @@ With this moderator, the heterogeneity lessens a bit.
 get_I2_var_levels(overlap_data, overlap_model_mod1)
 ```
 
-Almost all of the heterogeneity can be explained by between-studies variance.
-
 ## Target - amount of information
 
 ```{r}
 overlap_model_mod2 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), 
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
 overlap_model_mod2
@@ -300,7 +379,7 @@ emmeans_overlap3 <- summary(emmeans(qdrq_overlap3, "pt_comparison", "target_info
 emmeans_overlap3
 ```
 
-When target information is impoverished, tneither comparison significantly differs from 0. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, both pt comparisons differ from 0. The objective comparison condition led to a medium effect size, while the control comparison lead a medium to large effect size. 
+When target information is impoverished, neither comparison significantly differs from 0. Regardless of comparison condition, the effect does not significantly differ from 0 when target information was rated a 2. When target information is rated as highly detailed, only pt v control differs from 0.
 
 ### Heterogeneity
 
@@ -319,8 +398,6 @@ Heterogeneity is even lower when including target information in the model.
 ```{r levels I2 overlap targ info}
 get_I2_var_levels(overlap_data, overlap_model_mod2)
 ```
-
-Most of this heterogeneity is attributed to between-studies variance, with variance due to scales of measurement (17%) and then between-outcomes attributing to similar amounts (13%).
 
 With there being no redundancies in the model and lower I2, I wonder if we can model an interaction with scale?
 
@@ -342,7 +419,7 @@ overlap_data %>%
 overlap_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*outcome_scale_group*target_information,
-                      random = list(~ 1 |sample_number_total/outcome_type/effect_size_num), 
+                      random = list(~ 1 |authors/sample_number_total/outcomes_within_sample_var), 
                       data = overlap_data)
 
 overlap_model_mod3
@@ -379,14 +456,14 @@ overlap_data$target_ingroup_nonspecific <- droplevels(overlap_data$target_ingrou
 overlap_model_mod4 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_ingroup_nonspecific,
-                      random = list(~ 1 | sample_number_total/outcome_type/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
 overlap_model_mod4
 ```
 
-The intercept (pt_v_objective when the target is your in-group) is significantly different from 0. No effects differ from the intercept. Tried running an out-group moderator model as well, but it had a convergence issue.
+The intercept (pt_v_objective when the target is your in-group) is marginally different from 0. No effects differ from the intercept. Tried running an out-group moderator model as well, but it had a convergence issue.
 
 ### Marginal main effects
 
@@ -396,8 +473,6 @@ qdrq_overlap4 <- qdrg(object = overlap_model_mod4, data = overlap_data)
 emmeans_overlap4 <- summary(emmeans(qdrq_overlap4, "pt_comparison", "target_ingroup_nonspecific"))
 emmeans_overlap4
 ```
-
-The marginal main effects indicate that the average effect size is highest when pt is compared to the objective condition and the target is an in-group target, followed by when the target is an in-group and pt is compared to the control. Both significantly differed from 0. The effect sizes when the target is not an in-group member border being non-significant and are about the same regardless of if pt is being compared to the objective (.31) or control condition (.34). Both are lower than the in-group effect sizes.
 
 ### Heterogeneity
 
@@ -417,15 +492,13 @@ Heterogeneity is not as low as other moderators.
 get_I2_var_levels(overlap_data, overlap_model_mod4)
 ```
 
-Most heterogeneity is explained by between-studies variance, followed by between-outcomes variance.
-
 ## Sample size
 
 ```{r sample size mod overlap}
 overlap_model_mod5 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcome_type/effect_size_num,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                       data = overlap_data)
 
@@ -454,9 +527,11 @@ get_I2_var_levels(overlap_data, overlap_model_mod5)
 
 Most heterogeneity is explained by between-studies variance. 
 
-# Publication Bias - Egger's Test
+# Publication Bias - Egger's Test {.tabset .tabset-fade .tabset-pills}
 
-```{r}
+## Without paper as a nesting value
+
+```{r pub bias no paper}
 # Getting modified covariate that removes artifactual correlation between SMD ES and its related variance
 eggers_data_overlap <- overlap_data %>% 
     mutate(Va = 4/(n_overall), 
@@ -467,14 +542,55 @@ eggers_data_overlap <- overlap_data %>%
 
 mlma_egg_mod_sda_overlap <- rma.mv(dunb ~ 1 + sda, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcome_type/effect_size_num, 
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_overlap, test = "t")
 
 
 mlma_egg_mod_se_overlap <- rma.mv(dunb ~ 1 + sdi, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcome_type/effect_size_num, ,
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_overlap, test = "t")
+
+
+mlma_results_sda_overlap <- with(mlma_egg_mod_sda_overlap, 
+                                 data.frame(Egger_test = "Modified Covariate",
+                                                      beta = b[2], 
+                                                      se = se[2], 
+                                                      p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+mlma_results_se_overlap <- with(mlma_egg_mod_se_overlap, 
+                                data.frame(Egger_test = "Standard Error",
+                                                    beta = b[2], 
+                                                    se = se[2], 
+                                                    p_val = pt(zval[2], dfs, lower.tail = FALSE))) #this is the t-value
+
+egger_overlap_results <- rbind(mlma_results_sda_overlap, mlma_results_se_overlap)
+egger_overlap_results
+```
+
+## With paper as a nesting value
+
+```{r pub bias with paper}
+# Getting modified covariate that removes artifactual correlation between SMD ES and its related variance
+eggers_data_overlap <- overlap_data %>% 
+    mutate(Va = 4/(n_overall), 
+         sda = sqrt(Va),
+         sdi = sqrt(var_dunb))
+
+# Adapted from Rodgers & Putjevosky (2019) https://osf.io/7ak2m/?view_only=e74f9ddad3834e0e8c0bae9ef6b0441c
+
+mlma_egg_mod_sda_overlap <- rma.mv(dunb ~ 1 + sda, 
+                           V = var_dunb, 
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                           data = eggers_data_overlap, test = "t")
+
+
+mlma_egg_mod_se_overlap <- rma.mv(dunb ~ 1 + sdi, 
+                           V = var_dunb, 
+                           random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_overlap, test = "t")
 

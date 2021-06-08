@@ -94,7 +94,9 @@ meta_stereo1 <- meta_data %>%
                                      "self_v_objective",
                                      "self_v_control",
                                      "other_v_objective",
-                                     "other_v_control"))
+                                     "other_v_control"),
+         authors = as.factor(authors))
+
 meta_stereo1 %<>% 
   filter(outcome_type == "1")
 
@@ -109,7 +111,8 @@ meta_stereo2 <- meta_data %>%
   filter(pt_comparison == "pt_v_day_control" |
            pt_comparison == "pt_v_other_control" |
            pt_comparison == "pt_v_objective") %>% 
-  mutate(pt_comparison = as.factor(droplevels(pt_comparison)))
+  mutate(pt_comparison = as.factor(droplevels(pt_comparison)),
+         authors = as.factor(authors))
 
 meta_stereo2 %<>% 
   filter(outcome_type == "1")
@@ -124,7 +127,7 @@ meta_stereo1 %>%
   count()
 ```
 
-## Number of unique samples
+## Number of samples
 
 ```{r}
 meta_stereo1 %>% 
@@ -145,7 +148,9 @@ meta_stereo1 %>%
             mean(n_comparison))
 ```
 
-# Stereotyping Results: Imagine-self vs imagine-other Model {.tabset .tabset-fade .tabset-pills}
+# Stereotyping Results 1 {.tabset .tabset-fade .tabset-pills}
+
+**Imagine-self vs imagine-other Model**
 
 ## Results:
 
@@ -155,19 +160,37 @@ meta_stereo1 %>%
 contrasts(meta_stereo1$pt_comparison) 
 ```
 
+### Without author:
+
 **Results:**
 
 ```{r stereo model imagine self vs other}
 stereo_meta1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo1)
 
 stereo_meta1
 ```
 
 The intercept is not significantly different from zero, nor do any effects differ from it.
+
+### With paper:
+
+```{r stereo model imagine self vs other with paper}
+stereo_meta1_auth <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo1)
+
+stereo_meta1_auth
+```
+
+Paper explains no variance in this model, so we will not use it going forward.
 
 ## Marginal main effects
 
@@ -192,9 +215,8 @@ None of the marginal main effects differ from zero. There is an interesting patt
 
 ## Checking if model is over-parametized
 
-```{r check if model is over parametized, eval = FALSE}
+```{r check if model is over parametized}
 # Checking if model is over-parametized
-# code is very slow, so will not include in markdown
 par(mfrow=c(2,2))
 profile(stereo_meta1)
 
@@ -221,8 +243,6 @@ Again, very high.
 get_I2_levels(stereo_meta1)
 ```
 
-Most of the heterogeneity is explained by between-studies variance, with about 12% also explained by between-conditions (within-study) variance. This differed from the heterogeneity pattern found in the overall interaction model.
-
 ## Post-hoc power
 
 * k = 138 is the number of effect sizes
@@ -237,7 +257,58 @@ subgroup_power(n_groups = 4,
                es_type = "d")
 ```
 
-# Moderator Results: Imagine self vs other model {.tabset .tabset-fade .tabset-pills}
+## Forest plot for model 1
+
+```{r}
+par(mfrow=c(1,1))
+forest(stereo_meta1, 
+       slab = paste(meta_stereo1$authors, 
+                    meta_stereo1$Year, sep = ", "),
+       header="Author(s) and Year",
+       main = "Stereotyping model 1 forest plot",
+       ylim = c(-9, 144),
+       rows = c(-8:24, 29:72, 78:107, 113:143), # self vs obj, self vs co, other vs obj, other vs c
+       order = order(meta_stereo1$pt_comparison),
+       addfit=FALSE,
+       cex=0.3,
+       top = 0)
+
+text(x=-13, y=-11, labels=c("Self vs Objective"), cex = .6)
+addpoly(x = 0.0991, 
+        sei = 0.160, 
+        ci.lb = -0.214,
+        ci.ub = 0.413, 
+        rows = -11,
+        cex = .6)
+
+text(x=-13, y=26.5, labels=c("Self vs control"), cex = .6)
+addpoly(x = 0.0419, 
+        sei = 0.139, 
+        ci.lb = -0.230,
+        ci.ub = 0.314, 
+        rows = 26.5,
+        cex = .6)
+
+text(x=-13, y=75, labels=c("Other vs Objective"), cex = .6)
+addpoly(x = 0.0980, 
+        sei = 0.135, 
+        ci.lb = -0.167,
+        ci.ub = 0.363, 
+        rows = 75,
+        cex = .6)
+
+text(x=-13, y=110, labels=c("Other vs control"), cex = .6)
+addpoly(x = -0.0592, 
+        sei = 0.132, 
+        ci.lb = -0.318,
+        ci.ub = 0.200, 
+        rows = 110,
+        cex = .6)
+```
+
+# Moderator Results 1 {.tabset .tabset-fade .tabset-pills}
+
+**Imagine self vs other model**
 
 ## Scales of measurement
 
@@ -255,7 +326,8 @@ meta_stereo1_mod1_dat <- meta_stereo1 %>%
 stereo_meta1_mod1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = meta_stereo1_mod1_dat)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var), 
+                      data = meta_stereo1_mod1_dat)
 
 stereo_meta1_mod1
 
@@ -289,8 +361,9 @@ Without the crossed variance structure (because it is a moderator), more of that
 stereo_meta1_mod2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo1)
 
 stereo_meta1_mod2
 ```
@@ -337,8 +410,9 @@ stereo1_group_data <- meta_stereo1 %>%
 stereo_meta1_mod3 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_out_minor,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = stereo1_group_data)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = stereo1_group_data)
 
 stereo_meta1_mod3
 ```
@@ -380,8 +454,9 @@ Most of the variance is explained by between-studies or between-conditions (with
 stereo_meta1_mod4 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo1)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo1)
 
 stereo_meta1_mod4
 ```
@@ -408,7 +483,9 @@ get_I2_levels(stereo_meta1_mod4)
 
 Most variance is explained by between-studies variance, followed by between-outcomes (within-study) variance.
 
-# Stereotyping Results: Model comparing "day in the life," other control, and objective comparisons {.tabset .tabset-fade .tabset-pills}
+# Stereotyping Results 2 {.tabset .tabset-fade .tabset-pills}
+
+**Model comparing "day in the life," other control, and objective comparisons**
 
 ## Results
 
@@ -425,8 +502,9 @@ contrasts(meta_stereo2$pt_comparison)
 stereo_meta2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num, 
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo2)
 
 stereo_meta2
 ```
@@ -440,6 +518,22 @@ anova(stereo_meta2, btt=2:3)
 ```
 
 They do not significantly differ.
+
+### Adding paper
+
+```{r stereo model day in the life vs other control vs objective with paper}
+# OVerall model across outcome type
+stereo_meta2_auth <- rma.mv(dunb, 
+                      var_dunb, 
+                      mods = ~ pt_comparison,
+                      random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var, 
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo2)
+
+stereo_meta2_auth
+```
+
+No effect again, so will not use
 
 ## Marginal main effects:
 
@@ -496,7 +590,50 @@ subgroup_power(n_groups = 3,
                es_type = "d")
 ```
 
-# Moderator Results: Model comparing "day in the life," other control, and objective comparisons {.tabset .tabset-fade .tabset-pills}
+## Forest plot for stereotyping model 2
+
+```{r}
+forest(stereo_meta2, 
+       slab = paste(meta_stereo2$authors, 
+                    meta_stereo2$Year, sep = ", "),
+       header="Author(s) and Year",
+       main = "Stereotyping model 2 forest plot",
+       ylim = c(-9, 140),
+       rows = c(-8:28, 34:71, 77:139), 
+       order = order(meta_stereo2$pt_comparison),
+       addfit=FALSE,
+       cex=0.3,
+       top = 0)
+
+text(x=-12.2, y=-11, labels=c("PT vs 'Day in the life' control"), cex = .6)
+addpoly(x = 0.00152, 
+        sei = 0.191, 
+        ci.lb = -0.372,
+        ci.ub = 0.375, 
+        rows = -11,
+        cex = .6)
+
+text(x=-12.2, y=31, labels=c("PT vs 'No instructions' control"), cex = .6)
+addpoly(x = -0.02967, 
+        sei = 0.151, 
+        ci.lb = -0.326,
+        ci.ub = 0.266, 
+        rows = 31,
+        cex = .6)
+
+text(x=-13, y=74, labels=c("PT vs Objective"), cex = .6)
+addpoly(x = 0.10920, 
+        sei = 0.129, 
+        ci.lb = -0.144,
+        ci.ub = 0.362, 
+        rows = 74,
+        cex = .6)
+```
+
+
+# Moderator Results 2 {.tabset .tabset-fade .tabset-pills}
+
+**Model comparing "day in the life," other control, and objective comparisons**
 
 ## Scales of measurement
 
@@ -504,7 +641,8 @@ subgroup_power(n_groups = 3,
 stereo_meta2_mod1 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*outcome_scale_group,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var), 
+                      data = meta_stereo2)
 
 stereo_meta2_mod1
 ```
@@ -537,8 +675,9 @@ Most hetereogeneity is explained by between-studies variance, followed by betwee
 stereo_meta2_mod2 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_information,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo2)
 
 stereo_meta2_mod2
 ```
@@ -587,8 +726,9 @@ stereo2_group_data <- meta_stereo2 %>%
 stereo_meta2_mod3 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*target_out_minor,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = stereo2_group_data)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = stereo2_group_data)
 
 stereo_meta2_mod3
 ```
@@ -644,8 +784,9 @@ Most heterogeneity explained by between-studies variance, or between-conditions 
 stereo_meta2_mod4 <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison*n_overall,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
-                                    ~ 1 | outcome_scale_group/effect_size_num), data = meta_stereo2)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
+                                    ~ 1 | outcome_scale_group), 
+                      data = meta_stereo2)
 
 stereo_meta2_mod4
 ```
@@ -685,14 +826,14 @@ eggers_data_stereo <- meta_stereo1 %>% # Does not matter which dataset we use bc
 
 mlma_egg_mod_sda_stereo <- rma.mv(dunb ~ 1 + sda, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_stereo, test = "t")
 
 
 mlma_egg_mod_se_stereo <- rma.mv(dunb ~ 1 + sdi, 
                            V = var_dunb, 
-                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num,
+                           random = list(~ 1 | sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
                            data = eggers_data_stereo, test = "t")
 
@@ -750,7 +891,7 @@ heterotest1_stereo <- meta_stereo1 %>%
 stereo_meta1_heterotest <- rma.mv(dunb, 
                       var_dunb, 
                       mods = ~ pt_comparison,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/conditions_within_sample_var/effect_size_num), data = heterotest1_stereo)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var), data = heterotest1_stereo)
 
 stereo_meta1_heterotest 
 ```
@@ -798,7 +939,7 @@ heterotest2_stereo <- heterotest1_stereo %>%
 # Dropped crossed factor and conditions because we filtered down to one outcome and instruction type
 stereo_meta1_heterotest2 <- rma.mv(dunb, 
                       var_dunb,
-                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var/effect_size_num), data = heterotest2_stereo)
+                      random = list(~ 1 | sample_number_total/outcomes_within_sample_var), data = heterotest2_stereo)
 
 stereo_meta1_heterotest2 
 ```

@@ -256,3 +256,12 @@ get_Q_p_clean <- function(x){
     dplyr::select(-name, - value) %>% 
     round(digits = 4)
 }
+
+##### Function to print plots to pngs #####
+
+ggpreview <- function(...) {
+  fname <- tempfile(fileext = ".png")
+  ggsave(filename = fname, ...)
+  system2("open", fname)
+  invisible(NULL)
+}
