@@ -116,6 +116,8 @@ filtered_meta <- function(x, y, z){ #x is the overall dataset, y is the first se
 ### Function to clean data ####
 ###############################
 
+# dunb and hedge's g are the same: https://www.meta-analysis.com/downloads/Meta-analysis%20Effect%20sizes%20based%20on%20means.pdf
+
 meta_clean_func <- function(converted_data){
   converted_data %>%  
     mutate(cohens_d = as.numeric(cohens_d),

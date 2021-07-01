@@ -208,7 +208,9 @@ descrip_data %<>%
 
 boxplot(dunb ~ pt_comparison*outcome_type, data = descrip_data,
         col = (c("gold", "darkgreen")),
-        main = "Effect sizes by predictors for multivariate model")
+        ylab = "Effect size (g)",
+        xlab = "Instruction combination : Outcome category",
+        names = c("PO:IO", "PC:IO", "PO:OL", "PC:OL", "PO:IC", "PC:IC"))
 ```
 
 There are some outlier data points, which was also indicated by the histogram. Check out those that are >= 2 or -2 below to see if they were coded incorrectly by us or in the effect size conversion errored.
@@ -349,6 +351,64 @@ meta_overall1 %>%
   unique() %>% 
   group_by(pt_comparison, outcome_type) %>% 
   count() 
+```
+
+## K per cell of categorical moderator variables
+
+### Target information
+
+```{r mod var k targ info}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type, target_information) %>% 
+  unique() %>% 
+  group_by(outcome_type, target_information) %>% 
+  count()
+```
+
+### Out-group association
+
+```{r mod var k outgroup assoc}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type, target_out_minor) %>% 
+  unique() %>% 
+  group_by(outcome_type, target_out_minor) %>% 
+  count()
+```
+
+**NA's were coded as NA because they did not apply. Will remove from analysis.**
+
+### In-group association
+
+```{r mod var k in-group}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type, target_ingroup_nonspecific) %>% 
+  unique() %>% 
+  group_by(outcome_type, target_ingroup_nonspecific) %>% 
+  count()
+```
+
+**NA's were coded as NA because they did not apply. Will remove from analysis.**
+
+### Target in need/distress
+
+```{r mod var need distress}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type, target_empathetic_need) %>% 
+  unique() %>% 
+  group_by(outcome_type, target_empathetic_need) %>% 
+  count()
+```
+
+**NA's were coded as NA because they did not apply. Will remove from analysis.**
+
+### Scale of measurement
+
+```{r mod var scale of measurement}
+meta_overall1 %>% 
+  dplyr::select(dunb, outcome_type, outcome_scale_group) %>% 
+  unique() %>% 
+  group_by(outcome_type, outcome_scale_group) %>% 
+  count()
 ```
 
 # Overall Multivariate Meta-analysis {.tabset .tabset-fade .tabset-pills}
@@ -727,4 +787,54 @@ mlma_results_se <- with(mlma_egg_mod_se, data.frame(Egger_test = "Standard Error
 
 egger_overall_results <- rbind(mlma_results_sda, mlma_results_se)
 egger_overall_results
+```
+
+# Appendix A data
+
+```{r}
+appendix_vars <- meta_data %>% 
+  select(authors, Year, study_num_per_article, sample_number_total, pt_comparison, outcome_type, dunb, var_dunb, n_pt, n_comparison) %>% 
+   mutate(pt_comparison = dplyr::recode(pt_comparison,
+                                `1` = "Self PT vs Day control",
+                                `2` = "Self PT vs Other control",
+                                `3` = "Self PT vs Objective",
+                                `4` = "Self PT vs Suppression",
+                                `5` = "Other PT vs Day control",
+                                `6` = "Other PT vs Other control",
+                                `7` = "Other PT vs Objective",
+                                `9` = "Other PT vs Self PT",
+                                `10` = "PT US vs Day control",
+                                `11` = "PT US vs other control",
+                                `12` = "PT US vs Objective",
+                                `13` = "PT US vs Suppression"),
+         outcome_type = dplyr::recode(outcome_type,
+                               `3` = "Interpersonal Feels",
+                               `2` = "Overlap",
+                               `1` = "Stereotyping"))
+
+appendix_cats1 <- c("Self PT vs Day control", "Self PT vs Other control", "Self PT vs Objective", 
+                    "Other PT vs Day control", "Other PT vs Other control", "Other PT vs Objective")
+
+appendix_cats2 <- c("Interpersonal Feels", "Overlap", "Stereotyping")
+
+appendixa_SC_IF <- appendix_vars %>% 
+  filter(pt_comparison == appendix_cats1[1] & outcome_type == appendix_cats2[1]) %>% 
+  select(-pt_comparison, -outcome_type)
+
+
+
+for i in seq_along(appendix_cats1){
+  pt <- appendix_cats1[i]
+  df <- list(length = length(appendix_vars))
+  
+  for j in seq_along(appendix_cats2){
+    out <- appendix_cats2[j]
+    df <- appendix_vars %>% 
+      filter(pt_comparison == pt & outcome_type == out) %>% 
+  select(-pt_comparison, -outcome_type)
+
+  return(df)
+  }
+}
+
 ```

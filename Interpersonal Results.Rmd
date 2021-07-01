@@ -402,12 +402,15 @@ Most variance explained by between-study variance, with almost 12% explained by 
 ## Target - In need/In distress target grouping (relevant to outcome category)
 
 ```{r feels targ need mod}
+need_distress_data <- feels_mod %>% 
+  na.omit()
+
 feels_model_mod3 <- rma.mv(dunb, 
                       var_dunb,
                       mods = ~ pt_comparison*target_emapthetic_need,
                       random = list(~ 1 | authors/sample_number_total/outcomes_within_sample_var,
                                     ~ 1 | outcome_scale_group), 
-                      data = feels_mod)
+                      data = need_distress_data)
 
 feels_model_mod3
 ```
@@ -417,7 +420,7 @@ The intercept is significantly different from 0. The difference between other v 
 ### Marginal main effects
 
 ```{r emmeans feels empathetic need targ mod}
-qdrq_feels3 <- qdrg(object = feels_model_mod3, data = feels_mod)
+qdrq_feels3 <- qdrg(object = feels_model_mod3, data = need_distress_data)
 
 emmeans_feels3 <- summary(emmeans(qdrq_feels3, "pt_comparison", "target_emapthetic_need"))
 emmeans_feels3
@@ -430,7 +433,7 @@ When the target is empathetic (1), only when the instructions are other focused 
 #### I2 overall
 
 ```{r feels need targ I2 overall}
-get_I2_overall(feels_mod, feels_model_mod3)
+get_I2_overall(need_distress_data, feels_model_mod3)
 ```
 
 High heterogeneity
